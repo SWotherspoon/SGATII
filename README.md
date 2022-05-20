@@ -1,17 +1,19 @@
-
-# SGATII
+# SGATII - Solar Geolocation for Animal Tracking
 
 <!-- badges: start -->
 <!-- badges: end -->
 
-The goal of SGATII is to ...
+SGATII (pronounced "tags backwards also") provides facilities for
+estimating broadscale animal motions from local light level data
+recorded by archival tags.
+
 
 ## Installation
 
 You can install the development version of SGATII like so:
 
 ``` r
-# FILL THIS IN! HOW CAN PEOPLE INSTALL YOUR DEV PACKAGE?
+remotes::install_github("SWotherspoon/SGAT")
 ```
 
 ## Example
