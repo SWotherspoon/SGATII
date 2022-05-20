@@ -1,11 +1,11 @@
 ##' These functions wrap and unwrap a sequence of longitudes around
 ##' the dateline.
 ##'
-##' The `wrapLon` function wraps the longitudes back into the
-##' interval [lmin,lmin+360).  The `unwrapLon` function unwraps a
-##' sequence of longitudes so the the initial point lies in
-##' [lmin,lmin+360), but the subsequent longitudes in the sequence may
-##' wander outside that range.
+##' The `wrapLon` function wraps the longitudes back into the interval
+##' [lmin,lmin+360).  The `unwrapLon` function unwraps a sequence of
+##' longitudes so the the initial point lies in [lmin,lmin+360), but
+##' the subsequent longitudes in the sequence may wander outside that
+##' range.
 ##'
 ##' @title Wrap Locations Around the Dateline.
 ##' @param lon a vector of longitudes
@@ -37,6 +37,7 @@ unwrapLon <- function(lon,lmin=-180)
 ##' the solar declination are calculated for the times specified by
 ##' `tm` using the same methods as
 ##' <www.esrl.noaa.gov/gmd/grad/solcalc/>.
+##'
 ##' @title Solar Time and Declination
 ##' @param tm a vector of POSIXct times.
 ##' @return A list containing the following vectors.
@@ -119,11 +120,12 @@ solar <- function(tm) {
 
 ##' Calculate the solar zenith angle for given times and locations
 ##'
-##' `zenith` uses the solar time and declination calculated by
-##' `solar` to compute the solar zenith angle for given times and
-##' locations, using the same methods as
-##' <www.esrl.noaa.gov/gmd/grad/solcalc/>.  This function does not
-##' adjust for atmospheric refraction see [refracted()].
+##' `zenith` uses the solar time and declination calculated by `solar`
+##' to compute the solar zenith angle for given times and locations,
+##' using the same methods as <www.esrl.noaa.gov/gmd/grad/solcalc/>.
+##' This function does not adjust for atmospheric refraction see
+##' [refracted()].
+##'
 ##' @title Solar Zenith Angle
 ##' @param sun list of solar time and declination computed by
 ##' `solar`.
@@ -166,13 +168,13 @@ zenith <- function(sun,lon,lat) {
 ##' Adjust the solar zenith angle for atmospheric refraction.
 ##'
 ##' Given a vector of solar zeniths computed by [zenith()],
-##' `refracted` calculates the solar zeniths adjusted for the
-##' effect of atmospheric refraction.
+##' `refracted` calculates the solar zeniths adjusted for the effect
+##' of atmospheric refraction.
 ##'
-##' `unrefracted` is the inverse of `refracted`. Given a
-##' (single) solar zenith adjusted for the effect of atmospheric
-##' refraction, `unrefracted` calculates the solar zenith as
-##' computed by [zenith()].
+##' `unrefracted` is the inverse of `refracted`. Given a (single)
+##' solar zenith adjusted for the effect of atmospheric refraction,
+##' `unrefracted` calculates the solar zenith as computed by
+##' [zenith()].
 ##'
 ##' @title Atmospheric Refraction
 ##' @param zenith zenith angle (degrees) to adjust.
@@ -211,7 +213,7 @@ unrefracted <- function(zenith)
 ##' Estimate time of sunrise or sunset for a given location given the
 ##' approximate solar time of twilight
 ##'
-##' Solar declination and equation of time vary slowly over the day,
+##' Solar declinat`ion and equation of time vary slowly over the day,
 ##' and so the values of the Solar declination and equation of time at
 ##' sunrise/sunset can be caclulated approximately if an approximate
 ##' time of sunrise/sunset is known. The sun's hour angle and hence
@@ -250,8 +252,8 @@ twilightSolartime <- function(solar,lon,lat,rise,zenith=96) {
 ##' sunrise and sunset.
 ##'
 ##' Note that these functions return the twilight that occurs on the
-##' same date GMT as `tm`, and so sunset may occur before
-##' sunrise, depending upon latitude.
+##' same date GMT as `tm`, and so sunset may occur before sunrise,
+##' depending upon latitude.
 ##'
 ##' Solar declination and equation of time vary slowly over the day,
 ##' and so the values of the Solar declination and equation of time at
@@ -265,24 +267,23 @@ twilightSolartime <- function(solar,lon,lat,rise,zenith=96) {
 ##' less than 2 seconds within 2 or 3 iterations.
 ##'
 ##' It is possible that sunrise or sunset does occur for a given date
-##' and location. When `closest` is `FALSE`, the twilight
-##' returned on or before the (UTC) date of `tm`.  When
-##' `closest` is `TRUE`, `twilight` attempts to return
-##' the twilight closest to the input time `tm`.
+##' and location. When `closest` is `FALSE`, the twilight returned on
+##' or before the (UTC) date of `tm`.  When `closest` is `TRUE`,
+##' `twilight` attempts to return the twilight closest to the input
+##' time `tm`.
 ##'
-##' `sunrise` and `sunset` are simple wrappers for
-##' `twilight`.
+##' `sunrise` and `sunset` are simple wrappers for `twilight`.
 ##' @title Times of Sunrise and Sunset
 ##' @param tm vector of approximate times of twilight.
 ##' @param lon vector of longitudes.
 ##' @param lat vector of latitudes.
 ##' @param rise logical vector indicating whether to compute rise or
-##' set.
+##'   set.
 ##' @param zenith the solar zenith angle that defines twilight.
 ##' @param iters number of iteratve refinements made to the initial
-##' approximation.
-##' @param closest if `TRUE`, attempt to find the twilight
-##' closest to `tm`.
+##'   approximation.
+##' @param closest if `TRUE`, attempt to find the twilight closest to
+##'   `tm`.
 ##' @return a vector of twilight times.
 ##' @examples
 ##' ## Approx location of Santa Barbara
@@ -333,44 +334,14 @@ sunset <- function(tm,lon,lat,zenith=96,iters=3,closest=FALSE)
   twilight(tm,lon,lat,rise=FALSE,zenith=zenith,iters=iters,closest=closest)
 
 
-##' Midpoints of a path
-##'
-##' Compute the midpoints of a sequence of locations along a path.
-##' @title Path Midpoints
-##' @param p a two column matrix of (lon,lat) locations along the
-##' path.
-##' @param fold should the longitudes be folded into [-180,180).
-##' @return a two column matrix of (lon,lat) midpoints.
-##' @export
-trackMidpts <- function(p,fold=FALSE) {
-  n <- nrow(p)
-  rad <- pi/180
-  p <- rad*p
-  dlon <- diff(p[,1L])
-  lon1 <- p[-n,1L]
-  lat1 <- p[-n,2L]
-  lat2 <- p[-1L,2L]
-  bx <- cos(lat2)*cos(dlon)
-  by <- cos(lat2)*sin(dlon)
-  lat <- atan2(sin(lat1)+sin(lat2),sqrt((cos(lat1)+bx)^2+by^2))/rad
-  lon <- (lon1+atan2(by,cos(lat1)+bx))/rad
-  if(fold) lon <- wrapLon(lon)
-  cbind(lon,lat)
-}
-
 
 ##' Distances along a path
 ##'
-##' The `trackDist` computes the great circle distances (in km)
-##' between successive locations along path. The `trackDist2`
-##' accepts a second sequence of intermediate points, and computes the
-##' great circle distances along the dog leg paths from `x[i,]`
-##' to `z[i,]` to `x[i+1,]`.
+##' Compute the great circle distances (in km) between successive
+##' locations along path.
 ##'
 ##' @title Distance along a path
 ##' @param x a two column matrix of (lon,lat) locations along the path.
-##' @param z a two column matrix of (lon,lat) intermediate locations
-##' along the path.
 ##' @return vector of interpoint distances (km)
 ##' @export
 trackDist <- function(x) {
@@ -385,16 +356,11 @@ trackDist <- function(x) {
 
 ##' Bearing changes along a track
 ##'
-##' The `trackBearingChange` computes the change in bearing between
-##' successive locations along path. The `trackBearingChange2`
-##' accepts a second sequence of intermediate points, and computes the
-##' change in bearing along the dog leg paths from `x[i,]`
-##' to `z[i,]` to `x[i+1,]`.
+##' Compute the change in bearing between successive locations along
+##' path.
 ##'
 ##' @title Distance along a path
 ##' @param x a two column matrix of (lon,lat) locations along the path.
-##' @param z a two column matrix of (lon,lat) intermediate locations
-##' along the path.
 ##' @return vector of changes in bearing (degrees)
 ##' @export
 trackBearingChange <- function(x) {
@@ -417,15 +383,16 @@ trackBearingChange <- function(x) {
 ##' specified track.
 ##'
 ##' Given times, longitudes and latitudes that specify a template
-##' track, `zenithSimulate` interpolates the template onto the
-##' new times specified by `tm.out` and computes the solar zenith
-##' angle at each point along the new track. Given a dataframe
-##' generated by `zenithSimulate`, `twilightSimulate`
-##' computes times and locations of sunrise and sunset based on the
-##' simulated zenith angles. The `twilightPerturb` adds a given
-##' vector of errors (in minutes) to the twilights in a dataframe
-##' generated by `twilightSimulate`, in such a way that a
-##' positive error causes sunrise to occur later and sunset earlier.
+##' track, `zenithSimulate` interpolates the template onto the new
+##' times specified by `tm.out` and computes the solar zenith angle at
+##' each point along the new track. Given a dataframe generated by
+##' `zenithSimulate`, `twilightSimulate` computes times and locations
+##' of sunrise and sunset based on the simulated zenith angles. The
+##' `twilightPerturb` adds a given vector of errors (in minutes) to
+##' the twilights in a dataframe generated by `twilightSimulate`, in
+##' such a way that a positive error causes sunrise to occur later and
+##' sunset earlier.
+##'
 ##' @title Solar Zenith and Twilight Simulation
 ##' @param tm vector of times that specify the template track.
 ##' @param lon vector of longitude that specify the template track.
@@ -433,9 +400,6 @@ trackBearingChange <- function(x) {
 ##' @param tm.out vector of times to which the template is resampled.
 ##' @param dfz a dataframe generated with `zenithSimulate`.
 ##' @param zenith the solar zenith angle that defines twilight.
-##' @param dft a dataframe generated with `twilightSimulate`.
-##' @param err a vector of adjustments (in minutes) to the twilight
-##' times.
 ##' @return `zenithSimulate` returns a data frame with
 ##' components
 ##' \item{`Date`}{times along the simulated track}
@@ -494,7 +458,7 @@ twilightSimulate <- function(dfz,zenith=96) {
 
 
 
-##' Phaethon Model Structures for Stella and Estelle
+##' Phaethon Model Structures.
 ##'
 ##' Phaethon requires a model structure that describes the model being
 ##' fitted. This function generate basic model structures that should
@@ -534,32 +498,31 @@ twilightSimulate <- function(dfz,zenith=96) {
 ##' @param light vector of day/night observations
 ##' @param tm times at which to fit locations
 ##' @param x0 initial estimates of fitted locations.
+##' @param alpha rate parameter for sensor obscuration.
 ##' @param beta parameters of the behavioural model.
-##' @param logp function to evaluate any additional contribution to
-##' the log posterior from the twilight locations.
+##' @param logp.p function to evaluate any additional contribution to
+##'   the log posterior from the estiamted locations
 ##' @param fixedx logical vector indicating which twilight locations
-##' to hold fixed.
-##' @param dt (optional) vector of time intervals (hours) for speed calculation.
+##'   to hold fixed.
+##' @param dt (optional) vector of time intervals (hours) for speed
+##'   calculation.
 ##' @param zenith the solar zenith angle that defines twilight.
+##' @param forbid the log likelihood for forbidden light observations
 ##' @importFrom stats dgamma
-##' @return a list with components
-##' \item{`logpx`}{function to evaluate the contributions to the
-##' log posterior from the twilight model}
-##' \item{`logpz`}{function to evaluate the contributions to the
-##' log posterior from the prior for the z locations}
-##' \item{`estelle.logpb`}{function to evaluate contribution to
-##' the log posterior from the behavioural model for estelle.}
-##' \item{`stella.logpb`}{function to evaluate contribution to
-##' the log posterior from the behavioural model for stella.}
-##' \item{`residuals`}{function to evaluate the twilight model
-##' residuals.}
-##' \item{`fixedx`}{a logical vector indicating which locations
-##' should remain fixed.}
-##' \item{`x0`}{an array of initial twilight locations.}
-##' \item{`z0`}{an array of initial intermediate locations.}
-##' \item{`time`}{the twilight times.}
-##' \item{`rise`}{the sunrise indicators.}
-##' \item{`group`}{the grouping vector.}
+##' @return a list with components \item{`logp`}{function to evaluate
+##'   the contributions to the log posterior from the t}
+##'   \item{`logpz`}{function to evaluate the contributions to the log
+##'   posterior from the prior for the z locations}
+##'   \item{`estelle.logpb`}{function to evaluate contribution to the
+##'   log posterior from the behavioural model for estelle.}
+##'   \item{`stella.logpb`}{function to evaluate contribution to the
+##'   log posterior from the behavioural model for stella.}
+##'   \item{`residuals`}{function to evaluate the twilight model
+##'   residuals.}  \item{`fixedx`}{a logical vector indicating which
+##'   locations should remain fixed.}  \item{`x0`}{an array of initial
+##'   twilight locations.}  \item{`time`}{the twilight times.}
+##'   \item{`rise`}{the sunrise indicators.}  \item{`group`}{the
+##'   grouping vector.}
 ##' @export
 phaethonModel <- function(date,light,tm,x0,
                           alpha,beta,
@@ -588,6 +551,7 @@ phaethonModel <- function(date,light,tm,x0,
     ## Suggested starting points
     tm=tm,
     x0=x0,
+    fixedx=fixedx,
     ## Data
     date=date,
     light=light,
@@ -626,8 +590,7 @@ phaethonLightModel <- function(date,light,tm,alpha,forbid,zenith) {
 ##' model by the Metropolis algorithm.
 ##'
 ##' @title Metropolis Samplers
-##' @param model a model structure as generated by
-##' `thresholdModel`.
+##' @param model a model structure as generated by `thresholdModel`.
 ##' @param proposal function for drawing proposals for x.
 ##' @param x0 Starting values for twilight locations x.
 ##' @param iters number of samples to draw.
@@ -635,10 +598,9 @@ phaethonLightModel <- function(date,light,tm,alpha,forbid,zenith) {
 ##' @param chains number of chains to sample.
 ##' @param verbose report progress at prompt?
 ##' @return If there are r samples drawn for each of q chains of p
-##' parameters at n locations, Phaethon will return a list containing
-##' \item{`model`}{the model structure}
-##' \item{`x`}{a list of n x p x r arrays of twilight locations
-##' from the q chains}
+##'   parameters at n locations, Phaethon will return a list
+##'   containing \item{`model`}{the model structure} \item{`x`}{a list
+##'   of n x p x r arrays of twilight locations from the q chains}
 ##' @importFrom stats runif
 ##' @importFrom utils flush.console
 ##' @export
