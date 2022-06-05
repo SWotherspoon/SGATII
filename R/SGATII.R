@@ -179,7 +179,7 @@ zenith <- function(sun,lon,lat) {
 ##' @title Atmospheric Refraction
 ##' @param zenith zenith angle (degrees) to adjust.
 ##' @return vector of zenith angles (degrees) adjusted for atmospheric
-##' refraction.
+##'   refraction.
 ##' @examples
 ##' ## Refraction causes the sun to appears higher on the horizon
 ##' refracted(85:92)
@@ -207,131 +207,6 @@ refracted <- function(zenith) {
 ##' @export
 unrefracted <- function(zenith)
   uniroot(function(x) refracted(x)-zenith,c(zenith,zenith+2))
-
-
-
-##' Estimate time of sunrise or sunset for a given location given the
-##' approximate solar time of twilight
-##'
-##' Solar declinat`ion and equation of time vary slowly over the day,
-##' and so the values of the Solar declination and equation of time at
-##' sunrise/sunset can be caclulated approximately if an approximate
-##' time of sunrise/sunset is known. The sun's hour angle and hence
-##' sunrise/sunset for the required zenith can then be calculated from
-##' these approximations.
-##'
-##' Note this function returns the time of twilight in solar time.
-##' @title Solar Time of Sunrise and Sunset
-##' @param solar output of `solar` for approximate times of
-##' twilight.
-##' @param lon vector of longitudes.
-##' @param lat vector of latitudes.
-##' @param rise logical vector indicating whether to compute rise or
-##' set.
-##' @param zenith the solar zenith angle that defines twilight.
-##' @return a vector of twilight times in solar time (degrees)
-##' @seealso [twilight()]
-##' @export
-twilightSolartime <- function(solar,lon,lat,rise,zenith=96) {
-  rad <- pi/180
-  cosz <- cos(rad*zenith)
-  cosHA <- (cosz-sin(rad*lat)*solar$sinSolarDec)/(cos(rad*lat)*solar$cosSolarDec)
-  ## Compute the sun's hour angle from its declination for this location
-  hourAngle <- ifelse(rise,360,0)+ifelse(rise,-1,1)*suppressWarnings(acos(cosHA)/rad)
-  ## Solar time of sunrise at this zenith angle, lon and lat
-  #(hourAngle+180-lon)%%360
-  #360*(solar$solarTime%/%360)+solarTime
-  solarTime <- (hourAngle+180-lon)%%360
-  (solarTime-solar$solarTime+180)%%360-180+solar$solarTime
-}
-
-
-##' Estimate time of sunrise or sunset for a given day and location
-##'
-##' `twilight` uses an iterative algorithm to estimate times of
-##' sunrise and sunset.
-##'
-##' Note that these functions return the twilight that occurs on the
-##' same date GMT as `tm`, and so sunset may occur before sunrise,
-##' depending upon latitude.
-##'
-##' Solar declination and equation of time vary slowly over the day,
-##' and so the values of the Solar declination and equation of time at
-##' sunrise/sunset are well approximated by their values at 6AM/6PM
-##' local time. The sun's hour angle and hence sunrise/sunset for the
-##' required zenith can then be caclulates from these approximations.
-##' The calculation is then repeated using the approximate
-##' sunrise/sunset times to derive more accurate values of the Solar
-##' declination and equation of time and hence better approximations
-##' of sunrise/sunset.  The process is repreated and is accurate to
-##' less than 2 seconds within 2 or 3 iterations.
-##'
-##' It is possible that sunrise or sunset does occur for a given date
-##' and location. When `closest` is `FALSE`, the twilight returned on
-##' or before the (UTC) date of `tm`.  When `closest` is `TRUE`,
-##' `twilight` attempts to return the twilight closest to the input
-##' time `tm`.
-##'
-##' `sunrise` and `sunset` are simple wrappers for `twilight`.
-##' @title Times of Sunrise and Sunset
-##' @param tm vector of approximate times of twilight.
-##' @param lon vector of longitudes.
-##' @param lat vector of latitudes.
-##' @param rise logical vector indicating whether to compute rise or
-##'   set.
-##' @param zenith the solar zenith angle that defines twilight.
-##' @param iters number of iteratve refinements made to the initial
-##'   approximation.
-##' @param closest if `TRUE`, attempt to find the twilight closest to
-##'   `tm`.
-##' @return a vector of twilight times.
-##' @examples
-##' ## Approx location of Santa Barbara
-##' lon <- -119.7022
-##' lat <- 34.4191
-##' ## Sunrise and sunset for 8th April 2013 at Santa Barbara
-##' day <- as.POSIXct("2013-04-08","GMT")
-##' sunrise(day,lon,lat)
-##' sunset(day,lon,lat)
-##' @export
-twilight <- function(tm,lon,lat,rise,zenith=96,iters=3,closest=FALSE) {
-
-  ## Compute date
-  date <- as.POSIXlt(tm)
-  date$hour <- date$min <- date$sec <- 0
-  date <- as.POSIXct(date,"GMT")
-
-  lon <- (lon+180)%%360-180
-  ## GMT equivalent of 6am or 6pm local time
-  twl <- date+240*(ifelse(rise,90,270)-lon)
-  ## Iteratively improve estimate
-  for(k in seq_len(iters)) {
-    s <- solar(twl)
-    s$solarTime <- s$solarTime%%360
-    solarTime <- 4*twilightSolartime(s,lon,lat,rise,zenith)-s$eqnTime
-    twl <- date+60*solarTime
-  }
-
-  if(closest) {
-    delta <- (as.numeric(tm)-as.numeric(twl))/3600
-    off <- double(length(delta))
-    off[delta > 12] <- 86400
-    off[delta < -12] <- -86400
-    twl <- twilight(tm+off,lon,lat,rise,zenith,iters,FALSE)
-  }
-
-  twl
-}
-
-##' @rdname twilight
-##' @export
-sunrise <- function(tm,lon,lat,zenith=96,iters=3,closest=FALSE)
-  twilight(tm,lon,lat,rise=TRUE,zenith=zenith,iters=iters,closest=closest)
-
-##' @rdname twilight
-##' @export
-sunset <- function(tm,lon,lat,zenith=96,iters=3,closest=FALSE)
-  twilight(tm,lon,lat,rise=FALSE,zenith=zenith,iters=iters,closest=closest)
 
 
 
@@ -379,39 +254,24 @@ trackBearingChange <- function(x) {
 
 
 
-##' Simulate zenith angles, times and locations of twilight along a
-##' specified track.
+##' Simulate zenith angles, along a specified track.
 ##'
 ##' Given times, longitudes and latitudes that specify a template
 ##' track, `zenithSimulate` interpolates the template onto the new
 ##' times specified by `tm.out` and computes the solar zenith angle at
-##' each point along the new track. Given a dataframe generated by
-##' `zenithSimulate`, `twilightSimulate` computes times and locations
-##' of sunrise and sunset based on the simulated zenith angles. The
-##' `twilightPerturb` adds a given vector of errors (in minutes) to
-##' the twilights in a dataframe generated by `twilightSimulate`, in
-##' such a way that a positive error causes sunrise to occur later and
-##' sunset earlier.
+##' each point along the new track.
 ##'
-##' @title Solar Zenith and Twilight Simulation
+##' @title Solar Zenith Simulation
 ##' @param tm vector of times that specify the template track.
 ##' @param lon vector of longitude that specify the template track.
 ##' @param lat vector of latitude that specify the template track.
 ##' @param tm.out vector of times to which the template is resampled.
-##' @param dfz a dataframe generated with `zenithSimulate`.
-##' @param zenith the solar zenith angle that defines twilight.
 ##' @return `zenithSimulate` returns a data frame with
 ##' components
 ##' \item{`Date`}{times along the simulated track}
 ##' \item{`Lon`}{longitudes along the simulated track}
 ##' \item{`Lat`}{latitudes along the simulated track}
 ##' \item{`Zenith`}{zenith angles along the simulated track}
-##' `twilightSimulate` returns a data frame of twilights with
-##' components
-##' \item{`Twilight`}{times of twilight}
-##' \item{`Rise`}{is this a sunrise}
-##' \item{`Lon`}{longitude at twilight}
-##' \item{`Lat`}{latitude at twilight}
 ##' @importFrom stats approx
 ##' @export
 zenithSimulate <- function(tm,lon,lat,tm.out) {
@@ -432,44 +292,18 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 
 
 
-##' @rdname zenithSimulate
-##' @export
-twilightSimulate <- function(dfz,zenith=96) {
-
-  n <- nrow(dfz)
-
-  ## Compute indexes for sunrise and sunset
-  sr.k <- which(dfz$Zenith[-n] >= zenith & dfz$Zenith[-1L] < zenith)
-  ss.k <- which(dfz$Zenith[-n] < 96 & dfz$Zenith[-1L] >= 96)
-  ## Interleave sunrise and sunset
-  ord <- order(c(sr.k,ss.k))
-  k <- c(sr.k,ss.k)[ord]
-  rise <- rep(c(TRUE,FALSE),c(length(sr.k),length(ss.k)))[ord]
-  ## Interpolation weights
-  w <- (zenith-dfz$Zenith[k])/(dfz$Zenith[k+1L]-dfz$Zenith[k])
-
-  ## Interplated times and locations of twilight
-  data.frame(Twilight=dfz$Date[k] + w*(as.vector(dfz$Date[k+1L])-as.vector(dfz$Date[k])),
-             Rise=rise,
-             Lon=dfz$Lon[k] + w*(dfz$Lon[k+1L]-dfz$Lon[k]),
-             Lat=dfz$Lat[k] + w*(dfz$Lat[k+1L]-dfz$Lat[k]))
-}
-
-
-
-
-##' Phaethon Model Structures.
+##' Helios Model Structures.
 ##'
-##' Phaethon requires a model structure that describes the model being
+##' Helios requires a model structure that describes the model being
 ##' fitted. This function generate basic model structures that should
 ##' provide a suitable starting point for most analyses.
 ##'
-##' The `phaethonModel` function constructs a model structure that
-##' combines the `phaethonLightModel` with a behavioural model that
+##' The `heliosModel` function constructs a model structure that
+##' combines the `heliosLightModel` with a behavioural model that
 ##' assume the average speed of travel between successive locations is
 ##' Gamma distributed.
 ##'
-##' The phaethon light model assumes the light sensor cannot detect
+##' The helios light model assumes the light sensor cannot detect
 ##' light when it is dark, but may fail to detect light when it is
 ##' light because the sensor is obscured.  The model assumes the
 ##' length of time the sensor can be obscured is exponentially
@@ -481,7 +315,7 @@ twilightSimulate <- function(dfz,zenith=96) {
 ##' and rate are applied across all segments, but if `beta` is a two
 ##' column matrix the shape and rate can be specified on a segment by
 ##' segment basis. By default, the speed of travel is calculated based
-##' on the time intervals between the twilights (in hours), but the
+##' on the time intervals between the estimated locations (in hours), but the
 ##' intervals of time actually available for travel can be specified
 ##' directly with the `dt` argument.
 ##'
@@ -493,52 +327,50 @@ twilightSimulate <- function(dfz,zenith=96) {
 ##' constraint, making the observation of light in the dark unlikely
 ##' but not impossible.
 ##'
-##' @title Phaethon Model Structures
+##' @title Helios Model Structures
 ##' @param date POSIXct vector of times for day/nights observations
-##' @param light vector of day/night observations
-##' @param tm times at which to fit locations
+##' @param light logical vector of day/night observations
+##' @param time times at which to fit locations
 ##' @param x0 initial estimates of fitted locations.
 ##' @param alpha rate parameter for sensor obscuration.
 ##' @param beta parameters of the behavioural model.
 ##' @param logp.p function to evaluate any additional contribution to
 ##'   the log posterior from the estiamted locations
-##' @param fixedx logical vector indicating which twilight locations
+##' @param fixedx logical vector indicating which estimated locations
 ##'   to hold fixed.
 ##' @param dt (optional) vector of time intervals (hours) for speed
 ##'   calculation.
-##' @param zenith the solar zenith angle that defines twilight.
+##' @param zenith the solar zenith angle that defines day/night.
 ##' @param forbid the log likelihood for forbidden light observations
+##' @return a list with components
+##' \item{`time`}{the times at which locations are estimated}
+##' \item{`x0`}{an array of initial location estimates.}
+##' \item{`fixedx`}{a logical vector indicating which locations are
+##'   fixed.}
+##' \item{`logp`}{function to evaluate the log posterior}
+##' \item{`logp.p`}{function to evaluate the contributions to the log
+##'   posterior from the prior}
+##' \item{`logp.x`}{function to evaluate the contributions to the log
+##'   posterior from the light data}
+##' \item{`logp.b`}{function to evaluate the contributions to the log
+##'   posterior from the behavioural model}
 ##' @importFrom stats dgamma
-##' @return a list with components \item{`logp`}{function to evaluate
-##'   the contributions to the log posterior from the t}
-##'   \item{`logpz`}{function to evaluate the contributions to the log
-##'   posterior from the prior for the z locations}
-##'   \item{`estelle.logpb`}{function to evaluate contribution to the
-##'   log posterior from the behavioural model for estelle.}
-##'   \item{`stella.logpb`}{function to evaluate contribution to the
-##'   log posterior from the behavioural model for stella.}
-##'   \item{`residuals`}{function to evaluate the twilight model
-##'   residuals.}  \item{`fixedx`}{a logical vector indicating which
-##'   locations should remain fixed.}  \item{`x0`}{an array of initial
-##'   twilight locations.}  \item{`time`}{the twilight times.}
-##'   \item{`rise`}{the sunrise indicators.}  \item{`group`}{the
-##'   grouping vector.}
 ##' @export
-phaethonModel <- function(date,light,tm,x0,
+heliosModel <- function(date,light,time,x0,
                           alpha,beta,
                           logp.p=function(x) rep.int(0L,nrow(x)-1),
                           fixedx=FALSE,dt=NULL,zenith=96,forbid=-Inf) {
 
   ## Times (hours) between observations
   if(is.null(dt))
-    dt <- diff(as.numeric(tm)/3600)
+    dt <- diff(as.numeric(time)/3600)
 
   ## Ensure beta is always a matrix
   if(!is.matrix(beta)) beta <- t(beta)
 
 
   ## Contribution to log posterior for the light data
-  logp.x <- phaethonLightModel(date,light,tm,alpha,forbid,zenith)
+  logp.x <- heliosLightModel(date,light,time,alpha,zenith,forbid)
 
   logp.b <- function(x) {
     spd <- pmax.int(trackDist(x), 1e-06)/dt
@@ -548,34 +380,34 @@ phaethonModel <- function(date,light,tm,x0,
   logp <- function(x) logp.p(x)+logp.x(x)+logp.b(x)
 
   list(
-    ## Suggested starting points
-    tm=tm,
+    ## Location estimates
+    time=time,
     x0=x0,
     fixedx=fixedx,
     ## Data
     date=date,
     light=light,
     ## Components of the posterior
+    logp=logp,
     logp.p=logp.p,
-    logp.b=logp.b,
     logp.x=logp.x,
-    logp=logp)
+    logp.b=logp.b)
 }
 
-##' @rdname phaethonModel
+##' @rdname heliosModel
 ##' @export
-phaethonLightModel <- function(date,light,tm,alpha,forbid,zenith) {
+heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
 
-  ## Convert twilights to solar time.
+  ## Convert times to solar time.
   s <- solar(date)
 
-  segments <- as.numeric(cut(date,tm,include.lowest=TRUE))
+  segments <- as.numeric(cut(date,time,include.lowest=TRUE))
   ls <- split(light > 0,segments)
 
   function(x) {
     ## Interpolate
-    lon <- approx(tm,x[,1],date,rule=2)$y
-    lat <- approx(tm,x[,2],date,rule=2)$y
+    lon <- approx(time,x[,1],date,rule=2)$y
+    lat <- approx(time,x[,2],date,rule=2)$y
     ## Calculate where should be day
     zs <- split(zenith(s,lon,lat) < zenith,segments)
     ## Calculate costs per segment
@@ -584,27 +416,28 @@ phaethonLightModel <- function(date,light,tm,alpha,forbid,zenith) {
 }
 
 
-##' Metropolis sampler for Phaethon
+##' Metropolis sampler for Helios
 ##'
-##' These functions draw samples form posterior for the Phaethon
+##' These functions draw samples form posterior for the Helios
 ##' model by the Metropolis algorithm.
 ##'
 ##' @title Metropolis Samplers
-##' @param model a model structure as generated by `thresholdModel`.
+##' @param model a model structure as generated by [`heliosModel()`]
+##'   or equivalent.
 ##' @param proposal function for drawing proposals for x.
-##' @param x0 Starting values for twilight locations x.
+##' @param x0 Starting values for estimated locations x.
 ##' @param iters number of samples to draw.
 ##' @param thin rate at which to thin samples.
 ##' @param chains number of chains to sample.
 ##' @param verbose report progress at prompt?
 ##' @return If there are r samples drawn for each of q chains of p
-##'   parameters at n locations, Phaethon will return a list
-##'   containing \item{`model`}{the model structure} \item{`x`}{a list
-##'   of n x p x r arrays of twilight locations from the q chains}
+##'   parameters at n locations, Helios will return a list containing
+##'   \item{`model`}{the model structure}
+##'   \item{`x`}{a list of n x p x r arrays of estimated locations from the q chains}
 ##' @importFrom stats runif
 ##' @importFrom utils flush.console
 ##' @export
-phaethonMetropolis <- function(model,proposal,x0=NULL,
+heliosMetropolis <- function(model,proposal,x0=NULL,
                               iters=1000L,thin=10L,chains=1L,
                               verbose=interactive()) {
 
@@ -695,6 +528,284 @@ phaethonMetropolis <- function(model,proposal,x0=NULL,
 
 
 
+
+##' Number of locations
+##'
+##' A convience function to determine the number of locations a chain,
+##' or set of initial locations or a location summary
+##' describe. Assumes `s` is either an array or a list of arrays
+##' in which the first dimension corresponds to location, and returns
+##' the length of the first dimension.
+##'
+##' @title Number of locations
+##' @param s an array or a list of arrays.
+##' @return size of the first dimension of the array.
+##' @export
+nlocation <- function(s) {
+  dim(if(is.list(s)) s[[1]] else s)[1]
+}
+
+
+##' Summarize a set of location samples
+##'
+##' These functions compute various summaries of a sample or list of
+##' samples generated by `heliosMetropolis`.
+##'
+##' These functions accept either a sample from a single mcmc run, or
+##' a list of samples from parallel mcmc runs.  When `collapse` is
+##' true, multiple samples are merged and single result is returned,
+##' otherwise a result is returned for each sample.
+##'
+##' @rdname locationSummary
+##' @title Summaries of Location Samples
+##' @param s a single chain or a list of parallel chains generated by
+##' `heliosMetropolis`.
+##' @param time the times corresponding to the x locations.
+##' @param discard number of initial samples to discard.
+##' @param alpha coverage of the credible intervals calculated by
+##' `locationSummary`.
+##' @param collapse whether to collapse parallel chains to a single chain
+##' @param chains the set of chains to retain, or `NULL`.
+##' @return
+##' \item{`locationSummary`}{returns a dataframe or a list of
+##' dataframes of summary quantities for each location.}
+##' \item{`locationMean`}{returns an array or a list of arrays
+##' of the means of the samples for each location.}
+##' @importFrom stats sd quantile
+##' @export
+locationSummary <- function(s,time=NULL,discard=0,alpha=0.95,collapse=TRUE,chains=NULL) {
+  summary <- function(s) {
+     stat <- function(x) c(mean=mean(x),sd=sd(x),quantile(x,prob=c(0.5,(1-alpha)/2,1-(1-alpha)/2)))
+    lon <- t(apply(s[,1L,],1L,stat))
+    colnames(lon) <- paste("Lon",colnames(lon),sep=".")
+    lat <- t(apply(s[,2L,],1L,stat))
+    colnames(lat) <- paste("Lat",colnames(lat),sep=".")
+    d <- as.data.frame(cbind(lon,lat))
+    if(!is.null(time)) {
+      ## Add timing information
+      n <- nrow(d)
+      if(length(time)==n)
+        d <- cbind(Time=time,d)
+      else
+        d <- cbind(Time1=time[1:n],Time2=time[2:(n+1L)],d)
+    }
+    d
+   }
+
+  s <- chainCollapse(s,collapse=collapse,discard=discard,chains=chains)
+  if(is.list(s)) lapply(s,summary) else summary(s)
+}
+
+##' @rdname locationSummary
+##' @export
+locationMean <- function(s,discard=0,collapse=TRUE,chains=NULL) {
+  locmean <- function(s) apply(s[,1:2,],1:2,mean)
+
+  s <- chainCollapse(s,collapse=collapse,discard=discard,chains=chains)
+  if(is.list(s)) lapply(s,locmean) else locmean(s)
+}
+
+
+##' Bin locations to form a 2D density image
+##'
+##' Bins the samples for a sequence of locations to produce 2D array
+##' suitable for plotting with `image`.  Optionally, a vector of
+##' weights can be provided to differentially weight samples by
+##' location.
+##'
+##' This function accepts either a sample from a single mcmc run, or a
+##' list of samples from parallel mcmc runs.  If `collapse` is true,
+##' multiple samples are merged and single image is returned,
+##' otherwise an image is returned for each sample.
+##'
+##' @title Location Density Image
+##' @param s a single chain or a list of parallel chains generated by
+##' `heliosMetropolis`.
+##' @param xlim range of the first coordinate.
+##' @param ylim range of the second coordinate.
+##' @param nx number of cells in the first coordinate.
+##' @param ny number of cells in the second coordinate.
+##' @param weight weights for each location.
+##' @param discard number of initial samples to discard.
+##' @param collapse whether to collapse parallel chains to a single chain
+##' @param chains the set of chains to retain, or `NULL`.
+##' @return A list with elesments
+##' \item{`x`}{the x-ordinates that bound the bins}
+##' \item{`y`}{the y-ordinates that bound the bins}
+##' \item{`W`}{the weighted image.}
+##' @export
+locationImage <- function(s,xlim,ylim,nx,ny,weight=rep_len(1,dim(s)[1L]),
+                           discard=0,collapse=TRUE,chains=NULL) {
+  nx <- round(nx)
+  ny <- round(ny)
+  xbin <- seq.int(xlim[1L],xlim[2L],length.out=nx+1L)
+  ybin <- seq.int(ylim[1L],ylim[2L],length.out=ny+1L)
+
+  bin <- function(s) {
+    W <- 0
+    for(k in 1:dim(s)[1L]) {
+      W <- W+weight[k]*table(
+        factor(.bincode(s[k,1L,],xbin),levels=1:nx),
+        factor(.bincode(s[k,2L,],ybin),levels=1:ny))
+    }
+    W[W==0] <- NA
+    list(x=xbin,y=ybin,W=W)
+  }
+
+  s <- chainCollapse(s,collapse=collapse,discard=discard,chains=chains)
+  if(is.list(s)) lapply(s,bin) else bin(s)
+}
+
+
+
+
+##' Manipulate the samples generated by the Metropolis samplers.
+##'
+##' These functions provide some basic operations on the samples
+##' generated by the Metropolis samplers for Helios.
+##'
+##' @rdname chainSummary
+##' @title Manipulate MCMC samples
+##' @param s a single chain or a list of parallel chains generated by
+##'   `heliosMetropolis`.
+##' @param discard number of initial samples to discard.
+##' @param thin rate at which to thin the sample.
+##' @param collapse whether to collapse parallel chains to a single
+##'   chain
+##' @param chains the set of chains to retain, or `NULL`.
+##' @return
+##' * `chainSummary` returns a summary of the sample
+##' * `chainTail` discards the initial samples from each chain
+##' * `chainLast` returns the last sample for each location in each chain
+##' * `chainCollapse` collapses multiple chains into a single sample
+##' * `chainCov` returns the covariance of the parameters location by location as
+##'   a pxpxn array.
+##' * `chainBcov` returns the joint covariance of the parameters as an (np)x(np) array.
+##' * `chainAcceptance` returns the acceptance rate in the (thinned) chain
+##' @export
+chainSummary <- function(s) {
+  dm <- dim(s[[1]])
+  cat("Sample of",
+      dm[3L],"from",
+      length(s),"chains of",
+      dm[2L],"parameters for",
+      dm[1L],"locations\n")
+}
+
+##' @rdname chainSummary
+##' @export
+chainTail <- function(s,discard=0,thin=1) {
+  tail <- function(s) s[,,seq.int(from=1+max(discard,0),to=dim(s)[3L],by=thin)]
+  if(!is.list(s)) tail(s) else lapply(s,tail)
+}
+
+##' @rdname chainSummary
+##' @export
+chainLast <- function(s) {
+  last <- function(s) s[,,dim(s)[3L]]
+  if(!is.list(s)) last(s) else lapply(s,last)
+}
+
+
+##' @rdname chainSummary
+##' @export
+chainCollapse <- function(s,collapse=TRUE,discard=0,thin=1,chains=NULL) {
+  subset <- function(s) s[,,seq.int(from=1+max(discard,0),to=dim(s)[3L],by=thin)]
+  if(!is.list(s)) {
+    if(thin>1 || discard>0)
+      s <- subset(s)
+  } else {
+    if(!is.null(chains)) s <- s[chains]
+    if(thin>1 || discard>0) s <- lapply(s,subset)
+    if(collapse) {
+      dm <- dim(s[[1]])
+      s <- array(unlist(s),c(dm[1:2],length(s)*dm[3]))
+    }
+  }
+  s
+}
+
+
+
+##' @rdname chainSummary
+##' @importFrom stats var
+##' @export
+chainCov <- function(s,discard=0,chains=NULL) {
+  s <- chainCollapse(s,collapse=FALSE,discard=discard,chains=chains)
+
+  if(!is.list(s)) {
+    V <- apply(s,1L,function(x) var(t(x)))
+  } else {
+    dm <- dim(s[[1]])
+    V <- apply(array(unlist(lapply(s, function(s) apply(s,1L,function(y) var(t(y))))),
+                     c(dm[c(2L,2L,1L)],length(s))),
+               1:3,mean)
+  }
+  V
+}
+
+
+
+##' @rdname chainSummary
+##' @importFrom stats var
+##' @export
+chainBcov <- function(s,discard=0,chains=NULL) {
+  bcov <- function(s) {
+    dm <- dim(s)
+    dim(s) <- c(prod(dm[1:2]),dm[3])
+    var(t(s))
+  }
+
+  s <- chainCollapse(s,collapse=FALSE,discard=discard,chains=chains)
+  if(is.list(s))
+    apply(simplify2array(lapply(s,bcov)),1:2,mean)
+  else
+    bcov(s)
+}
+
+##' @rdname chainSummary
+##' @export
+chainAcceptance <- function(s,collapse=FALSE,chains=NULL) {
+  rate <- function(s) mean(apply(s,1,function(x) mean(rowMeans(x[,-1L]-x[,-ncol(x)]!=0))))
+
+  s <- chainCollapse(s,collapse=FALSE,chains=chains)
+  r <- if(is.list(s)) lapply(s,rate) else rate(s)
+  if(collapse & is.list(r)) do.call(mean,r) else r
+}
+
+
+
+##' Convert to Coda objects
+##'
+##' Convert samples generated by `helioMetropolis` or to a \pkg{coda}
+##' object.
+##'
+##' @title Export to Coda
+##' @param s a list of chains generated by `heliosMetropolis`
+##' @return a \pkg{coda} object.
+##' @importFrom coda mcmc mcmc.list
+##' @export
+chainCoda <- function(s) {
+  coda <- function(s) {
+      dm <- dim(s)
+      dim(s) <- c(prod(dm[1:2]),dm[3])
+      nms <- c("Lon","Lat")
+      if(dm[2]>2)
+          nms <- c("Lon","Lat",paste0("P",seq.int(length.out=dm[2]-2)))
+      nms <- as.vector(t(outer(nms,1:dm[1],paste,sep=".")))
+      rownames(s) <- nms
+      mcmc(t(s))
+  }
+  if(is.list(s)) {
+      if(length(s)==1) coda(s[[1]]) else do.call(mcmc.list,lapply(s,coda))
+  } else {
+      coda(s)
+  }
+}
+
+
+
+
 ##' Construct a sampler to draw multivariate Normal deviates.
 ##'
 ##' Construct a sampler that draws Multivariate Normal deviates with
@@ -768,4 +879,35 @@ bmvnorm <- function(S,m,s=1) {
     dim(z) <- c(n,m)
     mu+z
   }
+}
+
+
+##' Construct a (terra) raster of the Helios likelhood from a template
+##'
+##' Calculates the Helios model likelhood for a light record across a
+##' grid of locations specified by a template raster.
+##'
+##' @title Helios Light Raster
+##' @param date POSIXct vector of times for day/nights observations
+##' @param light logical vector of day/night observations
+##' @param raster a template raster defining the grid
+##' @param alpha rate parameter for sensor obscuration.
+##' @param zenith the solar zenith angle that defines day/night.
+##' @param forbid the log likelihood for forbidden light observations
+##' @return a raster of likelihood values.
+##' @importFrom terra rast xFromCol yFromRow values
+##' @export
+heliosLightRaster <- function(date,light,raster,alpha,zenith,forbid=-Inf) {
+  s <- solar(date)
+
+  lon <- xFromCol(raster,1:ncol(raster))
+  lat <- yFromRow(raster,1:nrow(raster))
+  M <- matrix(0,nrow(raster),ncol(raster))
+  for(i in seq_len(nrow(raster))) {
+    for(j in seq_len(ncol(raster))) {
+      z <- zenith(s,lon[j],lat[i]) < zenith
+      M[i,j] <- if(any(!z & light)) forbid else -alpha*sum(z & !light)
+    }
+  }
+  rast(M,extent=ext(raster))
 }

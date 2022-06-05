@@ -12,6 +12,9 @@ Authors@R:
              role = c("aut"),comment = c(ORCID = "0000-0002-6399-0035")))
 Description: Facilities for estimating the broadscale animal motions from
     archival tags that record local light levels.
+Imports:
+  terra,
+  coda
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
