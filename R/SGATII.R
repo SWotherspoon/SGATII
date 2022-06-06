@@ -314,8 +314,15 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 ##' Helios Model Structures.
 ##'
 ##' Helios requires a model structure that describes the model being
-##' fitted. This function generate basic model structures that should
-##' provide a suitable starting point for most analyses.
+##' fitted by providing functions that compute the contributions to
+##' the log posterior from each of the segments along the track
+##' (`logp.s`) and each of the locations on the track (`logp.x`),
+##' together with a vector of `time` times for which locations are
+##' estimated, a two column matrix `x0` of initial estimates of those
+##' locations and a logical vector `fixedx` that indicates which of
+##' those locations are fixed. This function generate basic model
+##' structures that should provide a suitable starting point for most
+##' analyses.
 ##'
 ##' The `heliosModel` function constructs a model structure that
 ##' combines the `heliosLightModel` with a behavioural model that
@@ -328,16 +335,6 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 ##' length of time the sensor can be obscured is exponentially
 ##' distributed, with rate `alpha`.
 ##'
-##' The speed of travel is assumed Gamma distributed.  The shape and
-##' rate of the Gamma distribution of speeds is specified by the
-##' `beta` parameter. If `beta` is a two element vector the same shape
-##' and rate are applied across all segments, but if `beta` is a two
-##' column matrix the shape and rate can be specified on a segment by
-##' segment basis. By default, the speed of travel is calculated based
-##' on the time intervals between the estimated locations (in hours), but the
-##' intervals of time actually available for travel can be specified
-##' directly with the `dt` argument.
-##'
 ##' The `forbid` argument represents the likelihood of light being
 ##' observed when it is dark.  When `forbid=-Inf` the initial
 ##' locations `x0` must be consistent with the observed light - there
@@ -346,6 +343,26 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 ##' constraint, making the observation of light in the dark unlikely
 ##' but not impossible.
 ##'
+##' The behavioural model assumes the speed of travel is Gamma
+##' distributed.  The shape and rate of the Gamma distribution of
+##' speeds is specified by the `beta` parameter. If `beta` is a two
+##' element vector the same shape and rate are applied across all
+##' segments, but if `beta` is a two column matrix the shape and rate
+##' can be specified on a segment by segment basis. By default, the
+##' speed of travel is calculated based on the time intervals between
+##' the estimated locations (in hours), but the intervals of time
+##' actually available for travel can be specified directly with the
+##' `dt` argument.  The behavioural model makes a contribution to the
+##' posterior on each segment of track.
+##'
+##' Both the light model and the behavioural model and make a
+##' contribution to the posterior on each segment of track.  The user
+##' is free to provide a function `logp.s0` of a single argument `x`
+##' (the locations) that returns an additional contribution to the
+##' posterior for each track segment, and a funtion `logp.p0` that
+##' returns an additional contribution to the posterior for each
+##' location.
+##'
 ##' @title Helios Model Structures
 ##' @param date POSIXct vector of times for day/nights observations
 ##' @param light logical vector of day/night observations
@@ -353,8 +370,10 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 ##' @param x0 initial estimates of fitted locations.
 ##' @param alpha rate parameter for sensor obscuration.
 ##' @param beta parameters of the behavioural model.
-##' @param logp.p function to evaluate any additional contribution to
-##'   the log posterior from the estiamted locations
+##' @param logp.p0 function to evaluate any additional contribution to
+##'   the log posterior from the estimated locations on the track
+##' @param logp.s0 function to evaluate any additional contribution to
+##'   the log posterior from the estimated segments of track
 ##' @param fixedx logical vector indicating which estimated locations
 ##'   to hold fixed.
 ##' @param dt (optional) vector of time intervals (hours) for speed
@@ -366,19 +385,21 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 ##' \item{`x0`}{an array of initial location estimates.}
 ##' \item{`fixedx`}{a logical vector indicating which locations are
 ##'   fixed.}
-##' \item{`logp`}{function to evaluate the log posterior}
+##' \item{`logp.s`}{function to evaluate the contributions to the log
+##'   posterior from the track segments}
 ##' \item{`logp.p`}{function to evaluate the contributions to the log
-##'   posterior from the prior}
-##' \item{`logp.x`}{function to evaluate the contributions to the log
-##'   posterior from the light data}
+##'   posterior from the track points}
+##' \item{`logp.l`}{function to evaluate the contributions to the log
+##'   posterior from the light model on each segment}
 ##' \item{`logp.b`}{function to evaluate the contributions to the log
-##'   posterior from the behavioural model}
+##'   posterior from the behavioural model on each segment}
 ##' @importFrom stats dgamma
 ##' @export
 heliosModel <- function(date,light,time,x0,
-                          alpha,beta,
-                          logp.p=function(x) rep.int(0L,nrow(x)-1),
-                          fixedx=FALSE,dt=NULL,zenith=96,forbid=-Inf) {
+                        alpha,beta,
+                        logp.p0=function(x) rep.int(0L,nrow(x)),
+                        logp.s0=function(x) rep.int(0L,nrow(x)-1),
+                        fixedx=FALSE,dt=NULL,zenith=96,forbid=-Inf) {
 
   ## Times (hours) between observations
   if(is.null(dt))
@@ -389,28 +410,32 @@ heliosModel <- function(date,light,time,x0,
 
 
   ## Contribution to log posterior for the light data
-  logp.x <- heliosLightModel(date,light,time,alpha,zenith,forbid)
+  logp.l <- heliosLightModel(date,light,time,alpha,zenith,forbid)
 
+  ## The behavioural model
   logp.b <- function(x) {
     spd <- pmax.int(trackDist(x), 1e-06)/dt
     dgamma(spd,beta[,1L],beta[,2L],log=TRUE)
   }
 
-  logp <- function(x) logp.p(x)+logp.x(x)+logp.b(x)
+  ## Total contribution on the segments
+  logp.s <- function(x) logp.s0(x)+logp.x(x)+logp.b(x)
+
 
   list(
     ## Location estimates
     time=time,
     x0=x0,
     fixedx=fixedx,
+    ## Components of the posterior
+    logp.s=logp.s,
+    logp.p=logp.p,
+    logp.l=logp.l,
+    logp.b=logp.b,
     ## Data
     date=date,
-    light=light,
-    ## Components of the posterior
-    logp=logp,
-    logp.p=logp.p,
-    logp.x=logp.x,
-    logp.b=logp.b)
+    light=light
+  )
 }
 
 ##' @rdname heliosModel
@@ -420,6 +445,9 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
   ## Convert times to solar time.
   s <- solar(date)
 
+  ## Precalculate cos(z)
+  cosZ <- cos(180/pi*zenith)
+
   segments <- as.numeric(cut(date,time,include.lowest=TRUE))
   ls <- split(light > 0,segments)
 
@@ -428,7 +456,7 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
     lon <- approx(time,x[,1],date,rule=2)$y
     lat <- approx(time,x[,2],date,rule=2)$y
     ## Calculate where should be day
-    zs <- split(zenith(s,lon,lat) < zenith,segments)
+    zs <- split(cosZenith(s,lon,lat) > cosZ,segments)
     ## Calculate costs per segment
     mapply(function(z,l) if(any(!z & l)) forbid else -alpha*sum(z & !l),zs,ls)
   }
@@ -471,7 +499,8 @@ heliosMetropolis <- function(model,proposal,x0=NULL,
   m <- ncol(x0[[1]])
 
   ## Extract model components
-  logp <- model$logp
+  logp.s <- model$logp.s
+  logp.p <- model$logp.p
   fixedx <- model$fixedx
 
   ## Lists of chains
@@ -489,8 +518,10 @@ heliosMetropolis <- function(model,proposal,x0=NULL,
 
     ## Contribution to logp from each track segment, padded with
     ## fictious segments at each end
-    logp.s1 <- c(0,logp(x1),0)
+    logp.s1 <- c(0,logp.s(x1),0)
 
+    ## Contributions to the log posterior from the locations
+    logp.p1 <- logp.p(x1)
 
     k2 <- 0
     if(verbose) {
@@ -522,16 +553,20 @@ heliosMetropolis <- function(model,proposal,x0=NULL,
 
           ## Contributions to the log posterior from each track
           ## segment, padded with a fictious segment at each end.
-          logp.s2 <- c(0,logp(x2),0)
+          logp.s2 <- c(0,logp.s(x2),0)
+
+          ## Contributions to the log posterior from the locations
+          logp.p2 <- logp.p(x2)
 
           ## The contribution to the log posterior from each location are
           ## the sums of the contributions from the surrounding segments.
-          logp1 <- logp.s1[is]+logp.s1[is+1L]
-          logp2 <- logp.s2[is]+logp.s2[is+1L]
+          logp1 <- logp.s1[is]+logp.s1[is+1L]+logp.p1(x1)
+          logp2 <- logp.s2[is]+logp.s2[is+1L]+logp.p2(x2)
 
           ## MH rule - compute indices of the accepted points.
           accept <- is[logp2-logp1 > log(runif(length(is)))]
           x1[accept,] <- x2[accept,]
+          logp.p1[accept] <- logp.p2[accept]
           logp.s1[accept] <- logp.s2[accept]
           logp.s1[accept+1L] <- logp.s2[accept+1L]
         }
