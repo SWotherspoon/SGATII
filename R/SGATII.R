@@ -126,13 +126,14 @@ solar <- function(tm) {
 ##' This function does not adjust for atmospheric refraction see
 ##' [refracted()].
 ##'
+##' `cosZenith` is an optimized version of `zenith` that calculates
+##' the cosine of the zenith angle.
 ##' @title Solar Zenith Angle
-##' @param sun list of solar time and declination computed by
-##' `solar`.
+##' @param sun list of solar time and declination computed by `solar`.
 ##' @param lon vector of longitudes.
 ##' @param lat vector latitudes.
 ##' @return A vector of solar zenith angles (degrees) for the given
-##' locations and times.
+##'   locations and times.
 ##' @seealso [solar()]
 ##' @examples
 ##' ## Approx location of Sydney Harbour Bridge
@@ -142,6 +143,8 @@ solar <- function(tm) {
 ##' ## at the Sydney Harbour Bridge
 ##' s <- solar(as.POSIXct("2000-05-01 12:00:00","EST"))
 ##' zenith(s,lon,lat)
+##' ## Cosine of the zenith angle
+##' cosZenith(s,lon,lat)
 ##' @export
 zenith <- function(sun,lon,lat) {
 
@@ -161,6 +164,22 @@ zenith <- function(sun,lon,lat) {
 
   ## Ignore refraction correction
   acos(cosZenith)/rad
+}
+
+
+##' @rdname zenith
+##' @export
+cosZenith <- function(sun,lon,lat) {
+
+  rad <- pi/180
+
+  ## Suns hour angle (degrees) [AC!!]
+  hourAngle <- sun$solarTime+lon-180
+  #hourAngle <- sun$solarTime%%360+lon-180
+
+  ## Cosine of sun's zenith [AD]
+  sn <- sin(rad*lat)
+  (sn*sun$sinSolarDec+sqrt(1-sn^2)*sun$cosSolarDec*cos(rad*hourAngle))
 }
 
 
