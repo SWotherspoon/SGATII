@@ -213,7 +213,8 @@ refracted <- function(zenith) {
   r <- ifelse(elev>85,0,
               ifelse(elev>5,58.1/te-0.07/te^3+0.000086/te^5,
                      ifelse(elev>-0.575,
-                            1735+elev*(-518.2+elev*(103.4+elev*(-12.79+elev*0.711))),-20.772/te)))
+                            1735+elev*(-518.2+elev*(103.4+elev*(-12.79+elev*0.711))),
+                            -20.772/te)))
   ## Corrected Zenith [90-AG]
   zenith-r/3600
 }
@@ -244,7 +245,8 @@ trackDist <- function(x) {
   cosx2 <- cos(rad*x[,2L])
   sinx2 <- sin(rad*x[,2L])
 
-  6378.137*acos(pmin.int(cosx2[-n]*cosx2[-1L]*cos(rad*(x[-1L,1L]-x[-n,1L]))+sinx2[-n]*sinx2[-1L],1))
+  6378.137*acos(pmin.int(
+    cosx2[-n]*cosx2[-1L]*cos(rad*(x[-1L,1L]-x[-n,1L]))+sinx2[-n]*sinx2[-1L],1))
 }
 
 
@@ -266,7 +268,8 @@ trackBearingChange <- function(x) {
 
   ## Bearing from one x to the next
   bs <- atan2(sin(rad*(x[-1L,1L]-x[-n,1L]))*cosx2[-1L],
-              cosx2[-n]*sinx2[-1L]-sinx2[-n]*cosx2[-1L]*cos(rad*(x[-1L,1L]-x[-n,1L])))/rad
+              cosx2[-n]*sinx2[-1L]-
+                sinx2[-n]*cosx2[-1L]*cos(rad*(x[-1L,1L]-x[-n,1L])))/rad
   ## Difference bs and fold difference into [-180,180)
   wrapLon(bs[1-n]-bs[-1])
 }
@@ -316,7 +319,7 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 ##' Helios requires a model structure that describes the model being
 ##' fitted by providing functions that compute the contributions to
 ##' the log posterior from each of the segments along the track
-##' (`logp.s`) and each of the locations on the track (`logp.x`),
+##' (`logp.s`) and each of the locations on the track (`logp.p`),
 ##' together with a vector of `time` times for which locations are
 ##' estimated, a two column matrix `x0` of initial estimates of those
 ##' locations and a logical vector `fixedx` that indicates which of
@@ -364,7 +367,7 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 ##' location.
 ##'
 ##' @title Helios Model Structures
-##' @param date POSIXct vector of times for day/nights observations
+##' @param date POSIXct vector of times for day/night observations
 ##' @param light logical vector of day/night observations
 ##' @param time times at which to fit locations
 ##' @param x0 initial estimates of fitted locations.
@@ -380,7 +383,7 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 ##'   calculation.
 ##' @param zenith the solar zenith angle that defines day/night.
 ##' @param forbid the log likelihood for forbidden light observations
-##' @return a list with components
+##' @return The `heliosModel` function returns list with components
 ##' \item{`time`}{the times at which locations are estimated}
 ##' \item{`x0`}{an array of initial location estimates.}
 ##' \item{`fixedx`}{a logical vector indicating which locations are
@@ -393,6 +396,12 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 ##'   posterior from the light model on each segment}
 ##' \item{`logp.b`}{function to evaluate the contributions to the log
 ##'   posterior from the behavioural model on each segment}
+##' \item{`predict`}{function to predict the zenith angle along a given
+##'   track.}
+##' \item{`Date`}{POSIXct vector of times for day/night observations.}
+##' \item{`Light`}{logical vector of day/night observations.}
+##' The `heliosLightModel` function returns just the `predict` and
+##' `logp.l` components.
 ##' @importFrom stats dgamma
 ##' @export
 heliosModel <- function(date,light,time,x0,
@@ -410,7 +419,9 @@ heliosModel <- function(date,light,time,x0,
 
 
   ## Contribution to log posterior for the light data
-  logp.l <- heliosLightModel(date,light,time,alpha,zenith,forbid)
+  model <- heliosLightModel(date,light,time,alpha,zenith,forbid)
+  logp.l <- model$logp.l
+  predict <- model$predict
 
   ## The behavioural model
   logp.b <- function(x) {
@@ -419,23 +430,26 @@ heliosModel <- function(date,light,time,x0,
   }
 
   ## Total contribution on the segments
-  logp.s <- function(x) logp.s0(x)+logp.x(x)+logp.b(x)
+  logp.s <- function(x) logp.s0(x)+logp.l(x)+logp.b(x)
 
-
-  list(
+  ## Create model
+  model <- list(
     ## Location estimates
     time=time,
     x0=x0,
     fixedx=fixedx,
     ## Components of the posterior
     logp.s=logp.s,
-    logp.p=logp.p,
+    logp.p=logp.p0,
     logp.l=logp.l,
     logp.b=logp.b,
+    ## light prediction
+    predict=predict,
     ## Data
     date=date,
     light=light
   )
+  model
 }
 
 ##' @rdname heliosModel
@@ -446,12 +460,27 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
   s <- solar(date)
 
   ## Precalculate cos(z)
-  cosZ <- cos(180/pi*zenith)
+  cosZ <- cos(pi/180*zenith)
 
-  segments <- as.numeric(cut(date,time,include.lowest=TRUE))
+  segments <- as.numeric(cut(date,time,labels=FALSE,include.lowest=TRUE))
   ls <- split(light > 0,segments)
 
-  function(x) {
+
+  predict <- function(x) {
+    ## Interpolate
+    lon <- approx(time,x[,1],date,rule=2)$y
+    lat <- approx(time,x[,2],date,rule=2)$y
+    ## Calculate cosz
+    cosZ <- cosZenith(s,lon,lat)
+    ## Limit to [-1,1] [!!]
+    cosZ[cosZ > 1] <- 1
+    cosZ[cosZ < -1] <- -1
+
+    ## Ignore refraction correction
+    180*acos(cosZ)/pi
+  }
+
+  logp.l <- function(x) {
     ## Interpolate
     lon <- approx(time,x[,1],date,rule=2)$y
     lat <- approx(time,x[,2],date,rule=2)$y
@@ -460,6 +489,8 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
     ## Calculate costs per segment
     mapply(function(z,l) if(any(!z & l)) forbid else -alpha*sum(z & !l),zs,ls)
   }
+
+  list(predict=predict,logp.l=logp.l)
 }
 
 
@@ -480,7 +511,8 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
 ##' @return If there are r samples drawn for each of q chains of p
 ##'   parameters at n locations, Helios will return a list containing
 ##'   \item{`model`}{the model structure}
-##'   \item{`x`}{a list of n x p x r arrays of estimated locations from the q chains}
+##'   \item{`x`}{a list of n x p x r arrays of estimated locations from
+##'              the q chains}
 ##' @importFrom stats runif
 ##' @importFrom utils flush.console
 ##' @export
@@ -503,11 +535,9 @@ heliosMetropolis <- function(model,proposal,x0=NULL,
   logp.p <- model$logp.p
   fixedx <- model$fixedx
 
-  ## Lists of chains
-  ch.xs <- vector(mode="list",chains)
 
   ## PARALLEL - parallelise this loop
-  for(k1 in 1:chains) {
+  ch.xs <- lapply(seq_len(chains),function(k1) {
     ## Allocate chain
     ch.x <- array(0,c(n,m,iters))
 
@@ -560,8 +590,8 @@ heliosMetropolis <- function(model,proposal,x0=NULL,
 
           ## The contribution to the log posterior from each location are
           ## the sums of the contributions from the surrounding segments.
-          logp1 <- logp.s1[is]+logp.s1[is+1L]+logp.p1(x1)
-          logp2 <- logp.s2[is]+logp.s2[is+1L]+logp.p2(x2)
+          logp1 <- logp.s1[is]+logp.s1[is+1L]+logp.p1[is]
+          logp2 <- logp.s2[is]+logp.s2[is+1L]+logp.p2[is]
 
           ## MH rule - compute indices of the accepted points.
           accept <- is[logp2-logp1 > log(runif(length(is)))]
@@ -574,9 +604,9 @@ heliosMetropolis <- function(model,proposal,x0=NULL,
       ## Store the current state
       ch.x[,,k2] <- x1
     }
-    ch.xs[[k1]] <- ch.x
     if(verbose) cat("\n")
-  }
+    ch.x
+  })
   list(model=model,x=ch.xs)
 }
 
@@ -585,11 +615,11 @@ heliosMetropolis <- function(model,proposal,x0=NULL,
 
 ##' Number of locations
 ##'
-##' A convience function to determine the number of locations a chain,
-##' or set of initial locations or a location summary
-##' describe. Assumes `s` is either an array or a list of arrays
-##' in which the first dimension corresponds to location, and returns
-##' the length of the first dimension.
+##' A convenience function to determine the number of locations a
+##' chain, or set of initial locations or a location summary
+##' describe. Assumes `s` is either an array or a list of arrays in
+##' which the first dimension corresponds to location, and returns the
+##' length of the first dimension.
 ##'
 ##' @title Number of locations
 ##' @param s an array or a list of arrays.
@@ -627,9 +657,12 @@ nlocation <- function(s) {
 ##' of the means of the samples for each location.}
 ##' @importFrom stats sd quantile
 ##' @export
-locationSummary <- function(s,time=NULL,discard=0,alpha=0.95,collapse=TRUE,chains=NULL) {
+locationSummary <- function(s,time=NULL,discard=0,alpha=0.95,
+                            collapse=TRUE,chains=NULL) {
   summary <- function(s) {
-     stat <- function(x) c(mean=mean(x),sd=sd(x),quantile(x,prob=c(0.5,(1-alpha)/2,1-(1-alpha)/2)))
+    stat <- function(x) c(mean=mean(x),
+                          sd=sd(x),
+                          quantile(x,prob=c(0.5,(1-alpha)/2,1-(1-alpha)/2)))
     lon <- t(apply(s[,1L,],1L,stat))
     colnames(lon) <- paste("Lon",colnames(lon),sep=".")
     lat <- t(apply(s[,2L,],1L,stat))
@@ -732,9 +765,10 @@ locationImage <- function(s,xlim,ylim,nx,ny,weight=rep_len(1,dim(s)[1L]),
 ##' * `chainTail` discards the initial samples from each chain
 ##' * `chainLast` returns the last sample for each location in each chain
 ##' * `chainCollapse` collapses multiple chains into a single sample
-##' * `chainCov` returns the covariance of the parameters location by location as
-##'   a pxpxn array.
-##' * `chainBcov` returns the joint covariance of the parameters as an (np)x(np) array.
+##' * `chainCov` returns the covariance of the parameters location by location
+##'   as a pxpxn array.
+##' * `chainBcov` returns the joint covariance of the parameters
+##'   as an (np)x(np) array.
 ##' * `chainAcceptance` returns the acceptance rate in the (thinned) chain
 ##' @export
 chainSummary <- function(s) {
@@ -749,7 +783,8 @@ chainSummary <- function(s) {
 ##' @rdname chainSummary
 ##' @export
 chainTail <- function(s,discard=0,thin=1) {
-  tail <- function(s) s[,,seq.int(from=1+max(discard,0),to=dim(s)[3L],by=thin)]
+  tail <- function(s)
+    s[,,seq.int(from=1+max(discard,0),to=dim(s)[3L],by=thin)]
   if(!is.list(s)) tail(s) else lapply(s,tail)
 }
 
@@ -764,7 +799,8 @@ chainLast <- function(s) {
 ##' @rdname chainSummary
 ##' @export
 chainCollapse <- function(s,collapse=TRUE,discard=0,thin=1,chains=NULL) {
-  subset <- function(s) s[,,seq.int(from=1+max(discard,0),to=dim(s)[3L],by=thin)]
+  subset <- function(s)
+    s[,,seq.int(from=1+max(discard,0),to=dim(s)[3L],by=thin)]
   if(!is.list(s)) {
     if(thin>1 || discard>0)
       s <- subset(s)
@@ -791,9 +827,10 @@ chainCov <- function(s,discard=0,chains=NULL) {
     V <- apply(s,1L,function(x) var(t(x)))
   } else {
     dm <- dim(s[[1]])
-    V <- apply(array(unlist(lapply(s, function(s) apply(s,1L,function(y) var(t(y))))),
-                     c(dm[c(2L,2L,1L)],length(s))),
-               1:3,mean)
+    V <- apply(array(
+      unlist(lapply(s, function(s) apply(s,1L,function(y) var(t(y))))),
+      c(dm[c(2L,2L,1L)],length(s))),
+      1:3,mean)
   }
   V
 }
@@ -820,7 +857,8 @@ chainBcov <- function(s,discard=0,chains=NULL) {
 ##' @rdname chainSummary
 ##' @export
 chainAcceptance <- function(s,collapse=FALSE,chains=NULL) {
-  rate <- function(s) mean(apply(s,1,function(x) mean(rowMeans(x[,-1L]-x[,-ncol(x)]!=0))))
+  rate <- function(s)
+    mean(apply(s,1,function(x) mean(rowMeans(x[,-1L]-x[,-ncol(x)]!=0))))
 
   s <- chainCollapse(s,collapse=FALSE,chains=chains)
   r <- if(is.list(s)) lapply(s,rate) else rate(s)
@@ -936,32 +974,105 @@ bmvnorm <- function(S,m,s=1) {
 }
 
 
-##' Construct a (terra) raster of the Helios likelhood from a template
+##' Construct a (terra) raster of the Helios log likelihood from a
+##' template
 ##'
-##' Calculates the Helios model likelhood for a light record across a
-##' grid of locations specified by a template raster.
+##' Calculates the Helios model log likelhood for a light record
+##' across a grid of locations specified by the template raster
+##' `mask`.  If `mask` has values, these are added to the log likelihood.
 ##'
 ##' @title Helios Light Raster
 ##' @param date POSIXct vector of times for day/nights observations
 ##' @param light logical vector of day/night observations
-##' @param raster a template raster defining the grid
+##' @param mask a template raster defining the grid
 ##' @param alpha rate parameter for sensor obscuration.
 ##' @param zenith the solar zenith angle that defines day/night.
 ##' @param forbid the log likelihood for forbidden light observations
 ##' @return a raster of likelihood values.
-##' @importFrom terra rast xFromCol yFromRow values
+##' @importFrom terra rast xFromCol yFromRow hasValues values ext
 ##' @export
-heliosLightRaster <- function(date,light,raster,alpha,zenith,forbid=-Inf) {
+heliosLightRaster <- function(date,light,mask,alpha,zenith,forbid=-Inf) {
   s <- solar(date)
+  cosZ <- cos(pi/180*zenith)
 
-  lon <- xFromCol(raster,1:ncol(raster))
-  lat <- yFromRow(raster,1:nrow(raster))
-  M <- matrix(0,nrow(raster),ncol(raster))
-  for(i in seq_len(nrow(raster))) {
-    for(j in seq_len(ncol(raster))) {
-      z <- zenith(s,lon[j],lat[i]) < zenith
-      M[i,j] <- if(any(!z & light)) forbid else -alpha*sum(z & !light)
+  lon <- xFromCol(mask,seq_len(ncol(mask)))
+  lat <- yFromRow(mask,seq_len(nrow(mask)))
+  M <- if(hasValues(mask)) values(mask) else 0
+  M <- matrix(M,nrow(mask),ncol(mask),byrow=TRUE)
+  for(i in seq_len(nrow(mask))) {
+    for(j in seq_len(ncol(mask))) {
+      if(is.finite(M[i,j])) {
+        z <- cosZenith(s,lon[j],lat[i]) > cosZ
+        logp <- if(any(!z & light)) forbid else -alpha*sum(z & !light)
+        M[i,j] <- M[i,j]+logp
+      }
     }
   }
-  rast(M,extent=ext(raster))
+  rast(M,extent=ext(mask))
+}
+
+
+
+
+##' Detemine a possible initial track for helios.
+##'
+##' The data are split into track segments defined by the location
+##' times `time`. For each track segment, [heliosLightRaster()] is
+##' used to calculate the log likelihood on the spatial grid defined
+##' by `mask`.  For each estimation time, a location is estimated by
+##' summing the log likelihoods for `n` segments either side of the
+##' location.
+##'
+##' If the template raster `mask` has values these are added to the
+##' log likelihood for each segment.
+##'
+##' @title Initial track
+##' @param date POSIXct vector of times for day/nights observations
+##' @param light logical vector of day/night observations
+##' @param time times at which to fit locations
+##' @param mask a template raster defining the grid
+##' @param alpha rate parameter for sensor obscuration.
+##' @param zenith the solar zenith angle that defines day/night.
+##' @param x location estimates
+##' @param n number of segments eith side to pool
+##' @param show should raster sums be plotted
+##'
+##' @return a two column matrix of location estimates
+##' @importFrom terra plot minmax xyFromCell
+##' @importFrom graphics points
+##' @importFrom viridisLite viridis
+##' @export
+heliosInit <- function(date,light,time,mask,alpha,zenith,x=NULL,n=1,show=FALSE) {
+
+  ## Split into track segments
+  light <- split(light,cut(date,time,labels=FALSE,include.lowest=TRUE))
+  date <- split(date,cut(date,time,labels=FALSE,include.lowest=TRUE))
+
+
+  ## Initialize postions and raster cache
+  if(is.null(x)) x <- matrix(NA,length(time),2)
+  rs <- vector(mode="list",length=length(date))
+
+  for(k in seq_along(time)) {
+    if(any(is.na(x[k,]))) {
+      ## Sum over adjacent segments
+      sm <- 0
+      for(i in max(1,k-n):min(k+n-1,length(rs))) {
+        ## Fill raster cache
+        if(is.null(rs[[i]]))
+          rs[[i]] <- heliosLightRaster(date[[i]],light[[i]],mask,alpha,zenith)
+        sm <- sm+rs[[i]]
+      }
+      ## Find first most likely cell
+      if(is.finite(minmax(sm)[2]))
+        x[k,] <- xyFromCell(sm,which.max(values(sm)))
+      if(show) {
+        plot(sm,col=viridis(50))
+        points(x[k,,drop=FALSE],col="red",pch=20)
+      }
+    }
+    ## Prune cache
+    if(k-n>0) rs[k-n] <- list(NULL)
+  }
+  x
 }
