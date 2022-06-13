@@ -13,6 +13,7 @@ Authors@R:
 Description: Facilities for estimating the broadscale animal motions from
     archival tags that record local light levels.
 Imports:
+  future.apply,
   terra,
   viridisLite,
   coda
