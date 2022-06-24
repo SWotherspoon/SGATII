@@ -410,17 +410,21 @@ heliosModel <- function(date,light,time,x0,
                         logp.s0=function(x) rep.int(0L,nrow(x)-1),
                         fixedx=FALSE,dt=NULL,zenith=96,forbid=-Inf) {
 
-  ## Times (hours) between observations
+  ## Times (hours) between locations
   if(is.null(dt))
     dt <- diff(as.numeric(time)/3600)
 
   ## Ensure beta is always a matrix
   if(!is.matrix(beta)) beta <- t(beta)
 
+  ## Trim data to location estimates
+  light <- light[date >= min(time) & date <= max(time)]
+  date <- date[date >= min(time) & date <= max(time)]
 
   ## Contribution to log posterior for the light data
   model <- heliosLightModel(date,light,time,alpha,zenith,forbid)
   logp.l <- model$logp.l
+  logp.l0 <- model$logp.l0
   predict <- model$predict
 
   ## The behavioural model
@@ -432,6 +436,7 @@ heliosModel <- function(date,light,time,x0,
   ## Total contribution on the segments
   logp.s <- function(x) logp.s0(x)+logp.l(x)+logp.b(x)
 
+  ## Contribution from the locations
   logp.p <- function(x) ifelse(fixedx,0,logp.p0(x))
 
   ## Create model
@@ -445,9 +450,10 @@ heliosModel <- function(date,light,time,x0,
     logp.p=logp.p,
     logp.l=logp.l,
     logp.b=logp.b,
+    logp.l0=logp.l0,
     ## light prediction
     predict=predict,
-    ## Data
+    ## Trimmed data
     date=date,
     light=light
   )
@@ -458,14 +464,17 @@ heliosModel <- function(date,light,time,x0,
 ##' @export
 heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
 
-  ## Convert times to solar time.
+  ## Convert times to solar time
   s <- solar(date)
 
   ## Precalculate cos(z)
   cosZ <- cos(pi/180*zenith)
 
   segments <- as.numeric(cut(date,time,labels=FALSE,include.lowest=TRUE))
-  ls <- split(light > 0,segments)
+  ks <- c(which(diff(segments)==1),length(date))
+  ls <- light > 0
+
+
 
 
   predict <- function(x) {
@@ -487,12 +496,20 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
     lon <- approx(time,x[,1],date,rule=2)$y
     lat <- approx(time,x[,2],date,rule=2)$y
     ## Calculate where should be day
-    zs <- split(cosZenith(s,lon,lat) > cosZ,segments)
+    zs <- cosZenith(s,lon,lat) > cosZ
     ## Calculate costs per segment
-    mapply(function(z,l) if(any(!z & l)) forbid else -alpha*sum(z & !l),zs,ls)
+    ifelse(diff(c(0,cumsum(!zs & light)[ks]))>0,forbid,-alpha*diff(c(0,cumsum(zs & !light)[ks])))
   }
 
-  list(predict=predict,logp.l=logp.l)
+  logp.l0 <- function(x) {
+    ## Calculate where should be day
+    zs <- cosZenith(s,x[1],x[2]) > cosZ
+    ## Calculate costs per segment
+    ifelse(diff(c(0,cumsum(!zs & light)[ks]))>0,forbid,-alpha*diff(c(0,cumsum(zs & !light)[ks])))
+  }
+
+
+  list(predict=predict,logp.l=logp.l,logp.l0=logp.l0)
 }
 
 
@@ -523,7 +540,7 @@ heliosMetropolis <- function(model,proposal,x0=NULL,
                               iters=1000L,thin=10L,chains=1L,
                               parallel=TRUE) {
 
-  ## Initialize x
+  ## Initialize x0
   if(is.null(x0)) x0 <- model$x0
   ## Expand starting values for multiple chains
   x0 <- rep(if(is.list(x0)) x0 else list(x0),length.out=chains)
@@ -559,8 +576,7 @@ heliosMetropolis <- function(model,proposal,x0=NULL,
     for(k2 in 1:iters) {
       for(k3 in 1:thin) {
 
-        ## Propose all x at once, keeping fixed points, and calculate
-        ## contribution to the log posterior
+        ## Propose all x at once, keeping fixed points
         xp <- proposal(x1)
         xp[fixedx,] <- x1[fixedx,]
 
@@ -967,47 +983,68 @@ bmvnorm <- function(S,m,s=1) {
 }
 
 
-##' Construct a (terra) raster of the Helios log likelihood from a
-##' template
+##' Calculate the Helios log likelihood over a discrete spatial grid
 ##'
-##' Calculates the Helios model log likelhood for a light record
-##' across a grid of locations specified by the template raster
-##' `mask`.  If `mask` has values, these are added to the log likelihood.
+##' Calculates contribution to the Helios log likelhood from a light
+##' record across a grid of locations specified by user.
 ##'
-##' @title Helios Light Raster
+##' The `heliosLightGrid` function requires the grid to be specied as
+##' a two column matrix of (lon,lat) locations, with the result
+##' returned as a vector.
+##'
+##' The `heliosLightRaster` function provides an alternative interface
+##' in which the grid is specified as a terra raster, with the result
+##' returned as raster.  If the input raster has values, locations
+##' with values that are missing or not finite are excluded from the
+##' grid.
+##'
+##' @title Helios Light Grid
+##' @param grid a two column matrix of (lon,lat) grid points.
+##' @param raster a terra raster.
 ##' @param date POSIXct vector of times for day/nights observations
 ##' @param light logical vector of day/night observations
-##' @param mask a template raster defining the grid
 ##' @param alpha rate parameter for sensor obscuration.
 ##' @param zenith the solar zenith angle that defines day/night.
 ##' @param forbid the log likelihood for forbidden light observations
-##' @return a raster of likelihood values.
-##' @importFrom terra rast xFromCol yFromRow hasValues values ext
+##' @return A vector or raster of likelihood values.
 ##' @export
-heliosLightRaster <- function(date,light,mask,alpha,zenith,forbid=-Inf) {
+heliosLightGrid <- function(grid,date,light,alpha,zenith,forbid=-Inf) {
+
+  ## Convert times to solar time
   s <- solar(date)
+
+  ## Precalculate cos(z)
   cosZ <- cos(pi/180*zenith)
 
-  lon <- xFromCol(mask,seq_len(ncol(mask)))
-  lat <- yFromRow(mask,seq_len(nrow(mask)))
-  M <- if(hasValues(mask)) values(mask) else 0
-  M <- matrix(M,nrow(mask),ncol(mask),byrow=TRUE)
-  for(i in seq_len(nrow(mask))) {
-    for(j in seq_len(ncol(mask))) {
-      if(is.finite(M[i,j])) {
-        z <- cosZenith(s,lon[j],lat[i]) > cosZ
-        logp <- if(any(!z & light)) forbid else -alpha*sum(z & !light)
-        M[i,j] <- M[i,j]+logp
-      }
-    }
+  vapply(seq_len(nrow(grid)),
+         function(i) {
+           z <- cosZenith(s,grid[i,1],grid[i,2]) > cosZ
+           if(any(!z & light)) forbid else -alpha*sum(z & !light)
+         },1.0)
+}
+
+
+##' @rdname heliosLightGrid
+##' @importFrom terra rast ncell xyFromCell hasValues values values<-
+##' @export
+heliosLightRaster <- function(raster,date,light,alpha,zenith,forbid=-Inf) {
+
+  r <- rast(raster)
+  if(hasValues(raster)) {
+    values(r) <- values(raster)
+    fill <- is.finite(values(r))
+    grid <- xyFromCell(raster,which(fill))
+    values(r)[fill] <- heliosLightGrid(grid,date,light,alpha,zenith,forbid)
+  } else {
+    grid <- xyFromCell(raster,seq_len(ncell(r)))
+    values(r) <- heliosLightGrid(grid,date,light,alpha,zenith,forbid)
   }
-  rast(M,extent=ext(mask))
 }
 
 
 
 
-##' Detemine a possible initial track for helios.
+##' Determine a possible initial track for helios.
 ##'
 ##' The data are split into track segments defined by the location
 ##' times `time`. For each track segment, [heliosLightRaster()] is
@@ -1068,4 +1105,160 @@ heliosInit <- function(date,light,time,mask,alpha,zenith,x=NULL,n=1,show=FALSE) 
     if(k-n>0) rs[k-n] <- list(NULL)
   }
   x
+}
+
+##' Draw samples for Helios from a discrete spatial grid.
+##'
+##' The `heliosDiscSampler` function draws samples from a Helios model
+##' where the locations are constrained to a discrete grid, and can be
+##' used to generate an initial track for the `heliosMetropolis`
+##' sampler. This sampler requires a weights object generated with
+##' either `heliosDiscGridWeights` or `heliosDiscRasterWeights`.
+##'
+##' To generate weights with `heliosDiscGridWeights` the user must
+##' specify the grid from which locations will be drawn as a two
+##' column matrix of (lon,lat) points. The grid can be arbitrary, but
+##' if the grid is too fine the sampler can be very memory intensive,
+##' and if the grid is to coarse the track can be inaccurate.  Even
+##' fro moderate grids the weights object can be very large, and
+##' should be discarded when no longer required.
+##'
+##' The `heliosDiscRasterWeights` function provides an alternative
+##' interface in which the grid is specified as a terra raster.  If
+##' that raster has values, locations with values that not finite are
+##' excluded from the grid.
+##'
+##' The sampler is an independence sampler in which the proposal is
+##' based on an approximation the to helios likelihood obtained by
+##' assuming the tag is stationary.  So for very fast moving
+##' individuals, the method can perform poorly.
+##'
+##' @title Discrete Sampler
+##' @param grid a two column matrix of (lon,lat) grid points.
+##' @param raster a terra raster.
+##' @param model a model structure as generated by [`heliosModel()`]
+##'   or equivalent.
+##' @param weights a weights object generated with
+##'   `heliosDiscGridWeights` or `heliosDiscRasterWeights`
+##' @param x0 starting values for estimated locations x.
+##' @param iters number of samples to draw.
+##' @return Returns an n x 2 x r array of r samples for n locations.
+##' @importFrom stats runif
+##' @export
+heliosDiscSampler <- function(weights,x0=NULL,iters=100L) {
+
+  grid <- weights$grid
+  model <- weights$model
+  W <- weights$W
+  m <- nrow(W)
+  n <- ncol(W)
+
+  ## Initialize x0
+  if(is.null(x0)) x0 <- model$x0
+
+  ## Extract model components
+  logp.s <- model$logp.s
+  logp.p <- model$logp.p
+  fixedx <- model$fixedx
+
+  ## Draw an initial sample
+  is <- vapply(seq_len(n),function(k) sample(m,1,prob=W[,k]),0L)
+  x1 <- grid[is,]
+  q1 <- W[cbind(is,seq_len(n))]
+  x1[fixedx] <- x0[fixedx]
+  q1[fixedx] <- 0
+
+  ## Allocate chain
+  ch <- array(0,c(n,2,iters))
+
+  ## Contribution to logp from each track segment, padded with
+  ## fictitious segments at each end
+  logp.s1 <- c(0,logp.s(x1),0)
+
+  ## Contributions to the log posterior from the locations
+  logp.p1 <- logp.p(x1)
+
+
+  for(k in seq_len(iters)) {
+
+    ## Propose all x at once, keeping fixed points
+    is <- vapply(seq_len(n),function(k) sample(m,1,prob=W[,k]),0L)
+    xp <- grid[is,]
+    qp <- W[cbind(is,seq_len(n))]
+    xp[fixedx] <- x1[fixedx]
+    qp[fixedx] <- 1
+
+    for(rb in 1:2) {
+
+      ## Modify every second location
+      is <- seq.int(rb,n,by=2L)
+      x2 <- x1
+      q2 <- q1
+      x2[is,] <- xp[is,]
+      q2[is] <- qp[is]
+
+      ## Contributions to the log posterior from each track
+      ## segment, padded with a fictious segment at each end.
+      logp.s2 <- c(0,logp.s(x2),0)
+
+      ## Contributions to the log posterior from the locations
+      logp.p2 <- logp.p(x2)
+
+      ## The contribution to the log posterior from each location are
+      ## the sums of the contributions from the surrounding segments.
+      logp1 <- logp.s1[is]+logp.s1[is+1L]+logp.p1[is]
+      logp2 <- logp.s2[is]+logp.s2[is+1L]+logp.p2[is]
+      logqr <- log(q2[is]) - log(q1[is])
+
+
+      ## MH rule - compute indices of the accepted points.
+      accept <- is[logp2-logp1-logqr > log(runif(length(is)))]
+      x1[accept,] <- x2[accept,]
+      q1[accept] <- q2[accept]
+      logp.p1[accept] <- logp.p2[accept]
+      logp.s1[accept] <- logp.s2[accept]
+      logp.s1[accept+1L] <- logp.s2[accept+1L]
+
+    }
+    ## Store the current state
+    ch[,,k] <- x1
+  }
+  ch
+}
+
+
+##' @rdname heliosDiscSampler
+##' @importFrom terra hasValues values xyFromCell ncell
+##' @export
+heliosDiscGridWeights <- function(grid,model) {
+
+  m <- nrow(grid)
+  n <- length(model$time)
+
+  ## Matrix of contributions to the posterior from the light for each
+  ## point of the grid, assuming animal is stationary.
+  W <- matrix(0,m,n)
+  for(k in seq_len(m)) {
+    if(k%%100==0) print(k/m)
+    lp <- model$logp.l0(grid[k,])
+    W[k,] <- c(0,lp) + c(lp,0)
+  }
+  ## Standardize at each location
+  for(k in seq_len(n)) W[,k] <- exp(W[,k]-max(W[,k]))
+
+  list(grid=grid,model=model,W=W)
+}
+
+
+##' @rdname heliosDiscSampler
+##' @importFrom terra hasValues values xyFromCell ncell
+##' @export
+heliosDiscRasterWeights <- function(raster,model) {
+
+  if(hasValues(raster))
+    grid <- xyFromCell(raster,which(is.finite(values(raster))))
+  else
+    grid <- xyFromCell(raster,seq_len(ncell(raster)))
+
+  heliosDiscGridWeights(grid,model)
 }
