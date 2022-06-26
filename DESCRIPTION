@@ -15,7 +15,6 @@ Description: Facilities for estimating the broadscale animal motions from
 Imports:
   future.apply,
   terra,
-  viridisLite,
   coda
 License: MIT + file LICENSE
 Encoding: UTF-8
