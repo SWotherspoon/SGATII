@@ -421,6 +421,9 @@ heliosModel <- function(date,light,time,x0,
   light <- light[date >= min(time) & date <= max(time)]
   date <- date[date >= min(time) & date <= max(time)]
 
+  ## Check fixed points
+  if(any(is.na(x0[fixedx,]))) warning("Fixed points cannot be NA")
+
   ## Contribution to log posterior for the light data
   model <- heliosLightModel(date,light,time,alpha,zenith,forbid)
   logp.l <- model$logp.l
@@ -437,7 +440,11 @@ heliosModel <- function(date,light,time,x0,
   logp.s <- function(x) logp.s0(x)+logp.l(x)+logp.b(x)
 
   ## Contribution from the locations
-  logp.p <- function(x) ifelse(fixedx,0,logp.p0(x))
+  logp.p <- function(x) {
+    r <- logp.p0(x)
+    r[fixedx] <- 0
+    r
+  }
 
   ## Create model
   model <- list(
@@ -473,9 +480,6 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
   segments <- as.numeric(cut(date,time,labels=FALSE,include.lowest=TRUE))
   ks <- c(which(diff(segments)==1),length(date))
   ls <- light > 0
-
-
-
 
   predict <- function(x) {
     ## Interpolate
