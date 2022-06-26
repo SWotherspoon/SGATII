@@ -13,15 +13,6 @@ recorded by archival tags.
 You can install the development version of SGATII like so:
 
 ``` r
-remotes::install_github("SWotherspoon/SGAT")
-```
-
-## Example
-
-This is a basic example which shows you how to solve a common problem:
-
-``` r
-library(SGATII)
-## basic example code
+remotes::install_github("SWotherspoon/SGATII")
 ```
 
