@@ -7,7 +7,7 @@ Authors@R:
       person("Micheal", "Sumner", email="Micheal.Sumner@aad.gov.au",
              role = c("aut")),
       person("Aidan", "Bindoff", email="Aidan.Bindoff@utas.edu.au",
-             role = c("aut")),
+             role = c("aut"),comment = c(ORCID = "0000-0002-0943-2702")),
       person("Simeon", "Lisovski", email="Simeon.Lisovski@awi.de",
              role = c("aut"),comment = c(ORCID = "0000-0002-6399-0035")))
 Description: Facilities for estimating the broadscale animal motions from
