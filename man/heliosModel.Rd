@@ -54,7 +54,7 @@ calculation.}
 \value{
 The \code{heliosModel} function returns list with components
 \item{\code{time}}{the times at which locations are estimated}
-\item{\code{x0}}{an array of initial location estimates.}
+\item{\code{x0}}{a two column array of initial location estimates.}
 \item{\code{fixedx}}{a logical vector indicating which locations are
 fixed.}
 \item{\code{logp.s}}{function to evaluate the contributions to the log

@@ -44,4 +44,7 @@ Metropolis sampler for Helios
 These functions draw samples from the posterior for the Helios
 model by the Metropolis algorithm.  If \code{parallel} is \code{TRUE} the
 chains are drawn in parallel with \code{\link[=future_lapply]{future_lapply()}}.
+
+The starting values \code{x0} should be specified as a two column
+matrix, or as a list of two column matrices, one for each chain.
 }
