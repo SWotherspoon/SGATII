@@ -20,7 +20,7 @@ or equivalent.}
 
 \item{proposal}{function for drawing proposals for x.}
 
-\item{x0}{Starting values for estimated locations x.}
+\item{x0}{starting values for estimated locations x.}
 
 \item{iters}{number of samples to draw.}
 
