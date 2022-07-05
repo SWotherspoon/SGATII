@@ -36,7 +36,7 @@ Draw samples for Helios from a discrete spatial grid.
 \details{
 The \code{heliosDiscSampler} function draws samples from a Helios model
 where the locations are constrained to a discrete grid, and can be
-used to generate an initial track for the \code{\link[=heliosMetropolis]{heliosMetropolis()}}
+used to generate an initial track for the \code{heliosMetropolis}
 sampler. This sampler requires a weights object generated with
 either \code{heliosDiscGridWeights} or \code{heliosDiscRasterWeights}.
 
@@ -52,10 +52,6 @@ The \code{heliosDiscRasterWeights} function provides an alternative
 interface in which the grid is specified as a terra raster.  If
 that raster has values, locations with values that not finite are
 excluded from the grid.
-
-This sampler does not require initial location estimates, and it
-only uses the initial locations \code{x0} from the model to specify
-fixed points.
 
 The sampler is an independence sampler in which the proposal is
 based on an approximation the to helios likelihood obtained by
