@@ -8,9 +8,9 @@
 \usage{
 heliosDiscSampler(weights, x = NULL, iters = 100L)
 
-heliosDiscGridWeights(grid, model)
+heliosDiscGridWeights(grid, model, autoscale = NA)
 
-heliosDiscRasterWeights(raster, model)
+heliosDiscRasterWeights(raster, model, autoscale = NA)
 }
 \arguments{
 \item{weights}{a weights object generated with
@@ -26,26 +26,33 @@ heliosDiscRasterWeights(raster, model)
 or equivalent.}
 
 \item{raster}{a terra raster.}
+
+\item{wmin}{a lower bound for the (finite) weights}
 }
 \value{
-Returns an n x 2 x r array of r samples for n locations.
+The functions \code{heliosDiscGridWeights} and
+\code{heliosDiscRasterWeights} return a list containing the matrix of
+grid points, the model object and the matrix of weights, and
+\code{heliosDiscSampler} returns an n x 2 x r array of r samples for
+the n locations.
 }
 \description{
 Draw samples for Helios from a discrete spatial grid.
 }
 \details{
-The \code{heliosDiscSampler} function draws samples from a Helios model
-where the locations are constrained to a discrete grid, and can be
-used to generate an initial track for the \code{heliosMetropolis}
-sampler. This sampler requires a weights object generated with
-either \code{heliosDiscGridWeights} or \code{heliosDiscRasterWeights}.
+The \code{heliosDiscSampler} function samples from a Helios model where
+the locations are constrained to a discrete spatial grid, and can
+be used to generate an initial track for the
+\code{\link[=heliosMetropolis]{heliosMetropolis()}} sampler.  The sampler requires a weights
+object generated with either \code{heliosDiscGridWeights} or
+\code{heliosDiscRasterWeights}.
 
 To generate weights with \code{heliosDiscGridWeights} the user must
 specify the grid from which locations will be drawn as a two
 column matrix of (lon,lat) points. The grid can be arbitrary, but
 if the grid is too fine the sampler can be very memory intensive,
 and if the grid is to coarse the track can be inaccurate.  Even
-fro moderate grids the weights object can be very large, and
+for moderate grids the weights object can be very large, and
 should be discarded when no longer required.
 
 The \code{heliosDiscRasterWeights} function provides an alternative
@@ -53,8 +60,23 @@ interface in which the grid is specified as a terra raster.  If
 that raster has values, locations with values that not finite are
 excluded from the grid.
 
-The sampler is an independence sampler in which the proposal is
-based on an approximation the to helios likelihood obtained by
-assuming the tag is stationary.  So for very fast moving
+The weights define the proposal distribution used by the sampler
+and represent the relative probabilities of a grid point being
+selected by the proposal distribution at location along the track.
+The weights are derived from the helios likelihood assuming the
+tag is stationary. If \code{autoscale} is \code{NA} the scaling of the
+weights is determined by the obscuration penalty chosen for the
+model. If \code{autoscale} is a constant the weights are scaled so the
+maximum weight is 1 and the minimum weight of a feasible grid
+point is the value of \code{autoscale}.  If scaling is a vector, its
+elements define the scaling used at each location.
+
+This sampler does not require initial location estimates and it
+only uses the initial locations \code{x0} from the model to specify
+fixed points, the remaining elements of \code{x0} are ignored.
+
+This is an independence sampler in which the proposal distribution
+is based on an approximation the to helios likelihood obtained by
+assuming the tag is stationary. So for very fast moving
 individuals, the method can perform poorly.
 }
