@@ -18,7 +18,7 @@ wrapLon <- function(lon,lmin=-180)
 ##' @rdname wrapLon
 ##' @export
 unwrapLon <- function(lon,lmin=-180)
-  cumsum(c(wrapLon(lon[1],lmin),wrapLon(diff(lon))))
+  cumsum(c(wrapLon(lon[1L],lmin),wrapLon(diff(lon))))
 
 
 
@@ -271,7 +271,7 @@ trackBearingChange <- function(x) {
               cosx2[-n]*sinx2[-1L]-
                 sinx2[-n]*cosx2[-1L]*cos(rad*(x[-1L,1L]-x[-n,1L])))/rad
   ## Difference bs and fold difference into [-180,180)
-  wrapLon(bs[1-n]-bs[-1])
+  wrapLon(bs[1L-n]-bs[-1L])
 }
 
 
@@ -407,7 +407,7 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 heliosModel <- function(date,light,time,x0,
                         alpha,beta,
                         logp.p0=function(x) rep.int(0L,nrow(x)),
-                        logp.s0=function(x) rep.int(0L,nrow(x)-1),
+                        logp.s0=function(x) rep.int(0L,nrow(x)-1L),
                         fixedx=FALSE,dt=NULL,zenith=96,forbid=-Inf) {
 
   ## Times (hours) between locations
@@ -425,7 +425,7 @@ heliosModel <- function(date,light,time,x0,
   if(any(is.na(x0[fixedx,]))) warning("Fixed points cannot be NA")
 
   ## Set fixed segments
-  fixeds <- if(length(fixedx)==1) FALSE else fixedx[-1] & fixedx[-length(fixedx)]
+  fixeds <- if(length(fixedx)==1L) FALSE else fixedx[-1L] & fixedx[-length(fixedx)]
   
   ## Contribution to log posterior for the light data
   model <- heliosLightModel(date,light,time,alpha,zenith,forbid)
@@ -491,8 +491,8 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
 
   predict <- function(x) {
     ## Interpolate
-    lon <- approx(time,x[,1],date,rule=2)$y
-    lat <- approx(time,x[,2],date,rule=2)$y
+    lon <- approx(time,x[,1L],date,rule=2)$y
+    lat <- approx(time,x[,2L],date,rule=2)$y
     ## Calculate cosz
     cosZ <- cosZenith(s,lon,lat)
     ## Limit to [-1,1] [!!]
@@ -505,8 +505,8 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
 
   logp.l <- function(x) {
     ## Interpolate
-    lon <- approx(time,x[,1],date,rule=2)$y
-    lat <- approx(time,x[,2],date,rule=2)$y
+    lon <- approx(time,x[,1L],date,rule=2)$y
+    lat <- approx(time,x[,2L],date,rule=2)$y
     ## Calculate where should be day
     zs <- cosZenith(s,lon,lat) > cosZ
     ## Calculate costs per segment
@@ -515,7 +515,7 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
 
   logp.l0 <- function(x) {
     ## Calculate where should be day
-    zs <- cosZenith(s,x[1],x[2]) > cosZ
+    zs <- cosZenith(s,x[1L],x[2L]) > cosZ
     ## Calculate costs per segment
     ifelse(diff(c(0,cumsum(!zs & light)[ks]))>0,forbid,-alpha*diff(c(0,cumsum(zs & !light)[ks])))
   }
@@ -561,9 +561,9 @@ heliosMetropolis <- function(model,proposal,x0=NULL,
   x0 <- rep(if(is.list(x0)) x0 else list(x0),length.out=chains)
 
   ## Number of locations
-  n <- nrow(x0[[1]])
+  n <- nrow(x0[[1L]])
   ## Number of parameters
-  m <- ncol(x0[[1]])
+  m <- ncol(x0[[1L]])
 
   ## Extract model components
   logp.s <- model$logp.s
@@ -588,14 +588,14 @@ heliosMetropolis <- function(model,proposal,x0=NULL,
     ## Contributions to the log posterior from the locations
     logp.p1 <- logp.p(x1)
 
-    for(k2 in 1:iters) {
-      for(k3 in 1:thin) {
+    for(k2 in 1L:iters) {
+      for(k3 in 1L:thin) {
 
         ## Propose all x at once, keeping fixed points
         xp <- proposal(x1)
         xp[fixedx,] <- x1[fixedx,]
 
-        for(rb in 1:2) {
+        for(rb in 1L:2L) {
 
           ## Modify every second location
           is <- seq.int(rb,n,by=2L)
@@ -840,7 +840,7 @@ heliosDiscSampler <- function(weights,x=NULL,iters=100L) {
     xp[fixedx] <- x1[fixedx]
     qp[fixedx] <- 1
 
-    for(rb in 1:2) {
+    for(rb in 1L:2L) {
 
       ## Modify every second location
       is <- seq.int(rb,n,by=2L)
@@ -953,13 +953,13 @@ heliosDiscMinimalTrack <- function(weights,gamma,ngbrs=50) {
   K <- matrix(0L,nrow(W),ncol(W))
 
   ## Tabulate log posterior along paths
-  if(fixed[1]>0)
+  if(fixed[1L]>0)
     maxL <- ifelse(1L:n==fixed[1L],0,forbid)
   else
     maxL <- log(W[,1L])
   
 
-  for(k in 2:ncol(W)) {
+  for(k in 2L:ncol(W)) {
 
     ## Neither point fixed
     if(fixed[k-1L]==0 && fixed[k]==0) {
@@ -1015,7 +1015,7 @@ heliosDiscMinimalTrack <- function(weights,gamma,ngbrs=50) {
   p <- integer(ncol(W))
   p[ncol(W)] <- k <- which.max(maxL)
   if(!is.finite(maxL[k])) warning("Minimal track inconsistent with data")
-  for(k in (ncol(W)-1):1L)
+  for(k in (ncol(W)-1L):1L)
     p[k] <- K[p[k+1L],k]
 
   ## Return coords of path
@@ -1036,7 +1036,7 @@ heliosDiscMinimalTrack <- function(weights,gamma,ngbrs=50) {
 ##' @return size of the first dimension of the array.
 ##' @export
 nlocation <- function(s) {
-  dim(if(is.list(s)) s[[1]] else s)[1]
+  dim(if(is.list(s)) s[[1L]] else s)[1L]
 }
 
 
@@ -1084,7 +1084,7 @@ locationSummary <- function(s,time=NULL,discard=0,alpha=0.95,
       if(length(time)==n)
         d <- cbind(Time=time,d)
       else
-        d <- cbind(Time1=time[1:n],Time2=time[2:(n+1L)],d)
+        d <- cbind(Time1=time[1L:n],Time2=time[2L:(n+1L)],d)
     }
     d
    }
@@ -1096,7 +1096,7 @@ locationSummary <- function(s,time=NULL,discard=0,alpha=0.95,
 ##' @rdname locationSummary
 ##' @export
 locationMean <- function(s,discard=0,collapse=TRUE,chains=NULL) {
-  locmean <- function(s) apply(s[,1:2,],1:2,mean)
+  locmean <- function(s) apply(s[,1L:2L,],1L:2L,mean)
 
   s <- chainCollapse(s,collapse=collapse,discard=discard,chains=chains)
   if(is.list(s)) lapply(s,locmean) else locmean(s)
@@ -1140,10 +1140,10 @@ locationImage <- function(s,xlim,ylim,nx,ny,weight=rep_len(1,dim(s)[1L]),
 
   bin <- function(s) {
     W <- 0
-    for(k in 1:dim(s)[1L]) {
+    for(k in 1L:dim(s)[1L]) {
       W <- W+weight[k]*table(
-        factor(.bincode(s[k,1L,],xbin),levels=1:nx),
-        factor(.bincode(s[k,2L,],ybin),levels=1:ny))
+        factor(.bincode(s[k,1L,],xbin),levels=1L:nx),
+        factor(.bincode(s[k,2L,],ybin),levels=1L:ny))
     }
     W[W==0] <- NA
     list(x=xbin,y=ybin,W=W)
@@ -1219,7 +1219,7 @@ chainCollapse <- function(s,collapse=TRUE,discard=0,thin=1,chains=NULL) {
     if(thin>1 || discard>0) s <- lapply(s,subset)
     if(collapse) {
       dm <- dim(s[[1]])
-      s <- array(unlist(s),c(dm[1:2],length(s)*dm[3]))
+      s <- array(unlist(s),c(dm[1L:2L],length(s)*dm[3L]))
     }
   }
   s
@@ -1240,7 +1240,7 @@ chainCov <- function(s,discard=0,chains=NULL) {
     V <- apply(array(
       unlist(lapply(s, function(s) apply(s,1L,function(y) var(t(y))))),
       c(dm[c(2L,2L,1L)],length(s))),
-      1:3,mean)
+      1L:3L,mean)
   }
   V
 }
@@ -1253,13 +1253,13 @@ chainCov <- function(s,discard=0,chains=NULL) {
 chainBcov <- function(s,discard=0,chains=NULL) {
   bcov <- function(s) {
     dm <- dim(s)
-    dim(s) <- c(prod(dm[1:2]),dm[3])
+    dim(s) <- c(prod(dm[1L:2L]),dm[3L])
     var(t(s))
   }
 
   s <- chainCollapse(s,collapse=FALSE,discard=discard,chains=chains)
   if(is.list(s))
-    apply(simplify2array(lapply(s,bcov)),1:2,mean)
+    apply(simplify2array(lapply(s,bcov)),1L:2L,mean)
   else
     bcov(s)
 }
@@ -1290,16 +1290,16 @@ chainAcceptance <- function(s,collapse=FALSE,chains=NULL) {
 chainCoda <- function(s) {
   coda <- function(s) {
       dm <- dim(s)
-      dim(s) <- c(prod(dm[1:2]),dm[3])
+      dim(s) <- c(prod(dm[1L:2L]),dm[3L])
       nms <- c("Lon","Lat")
-      if(dm[2]>2)
-          nms <- c("Lon","Lat",paste0("P",seq.int(length.out=dm[2]-2)))
-      nms <- as.vector(t(outer(nms,1:dm[1],paste,sep=".")))
+      if(dm[2L]>2)
+          nms <- c("Lon","Lat",paste0("P",seq.int(length.out=dm[2L]-2)))
+      nms <- as.vector(t(outer(nms,1L:dm[1L],paste,sep=".")))
       rownames(s) <- nms
       mcmc(t(s))
   }
   if(is.list(s)) {
-      if(length(s)==1) coda(s[[1]]) else do.call(mcmc.list,lapply(s,coda))
+      if(length(s)==1) coda(s[[1L]]) else do.call(mcmc.list,lapply(s,coda))
   } else {
       coda(s)
   }
@@ -1353,7 +1353,7 @@ mvnorm <- function(S,s=1,n=1,tol=1.0E-6) {
     S <- array(s*fchol(S),c(m,m,n))
   } else {
     n <- dim(S)[3L]
-    for(k in 1:n) {
+    for(k in 1L:n) {
       S[,,k] <- s*fchol(S[,,k])
     }
   }
