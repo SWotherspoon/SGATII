@@ -13,14 +13,15 @@ heliosModel(
   alpha,
   beta,
   logp.p0 = function(x) rep.int(0L, nrow(x)),
-  logp.s0 = function(x) rep.int(0L, nrow(x) - 1),
+  logp.s0 = function(x) rep.int(0L, nrow(x) - 1L),
   fixedx = FALSE,
   dt = NULL,
   zenith = 96,
-  forbid = -Inf
+  forbid = -Inf,
+  max.adjust = FALSE
 )
 
-heliosLightModel(date, light, time, alpha, zenith, forbid)
+heliosLightModel(date, light, time, alpha, zenith, forbid, max.adjust)
 }
 \arguments{
 \item{date}{POSIXct vector of times for day/night observations}
@@ -50,6 +51,9 @@ calculation.}
 \item{zenith}{the solar zenith angle that defines day/night.}
 
 \item{forbid}{the log likelihood for forbidden light observations}
+
+\item{max.adjust}{adjust for tags that record the maximum light
+level observed in the interval}
 }
 \value{
 The \code{heliosModel} function returns list with components
@@ -125,4 +129,10 @@ is free to provide a function \code{logp.s0} of a single argument \code{x}
 posterior for each track segment, and a funtion \code{logp.p0} that
 returns an additional contribution to the posterior for each
 location.
+
+Some tags record the maximum light level observed in the
+preceeding sampling interval, so that when the sun is going down,
+the tag reports the light from the beginning of the sampling
+interval. The \code{max.adjust} argument tries to compensate for this
+behaviour, and for some tags will yield more reliable estimates.
 }

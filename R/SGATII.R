@@ -366,6 +366,12 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 ##' returns an additional contribution to the posterior for each
 ##' location.
 ##'
+##' Some tags record the maximum light level observed in the
+##' preceeding sampling interval, so that when the sun is going down,
+##' the tag reports the light from the beginning of the sampling
+##' interval. The `max.adjust` argument tries to compensate for this
+##' behaviour, and for some tags will yield more reliable estimates.
+##'
 ##' @title Helios Model Structures
 ##' @param date POSIXct vector of times for day/night observations
 ##' @param light logical vector of day/night observations
@@ -383,6 +389,8 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 ##'   calculation.
 ##' @param zenith the solar zenith angle that defines day/night.
 ##' @param forbid the log likelihood for forbidden light observations
+##' @param max.adjust adjust for tags that record the maximum light
+##'   level observed in the interval 
 ##' @return The `heliosModel` function returns list with components
 ##' \item{`time`}{the times at which locations are estimated}
 ##' \item{`x0`}{a two column array of initial location estimates.}
@@ -408,7 +416,8 @@ heliosModel <- function(date,light,time,x0,
                         alpha,beta,
                         logp.p0=function(x) rep.int(0L,nrow(x)),
                         logp.s0=function(x) rep.int(0L,nrow(x)-1L),
-                        fixedx=FALSE,dt=NULL,zenith=96,forbid=-Inf) {
+                        fixedx=FALSE,dt=NULL,zenith=96,forbid=-Inf,
+                        max.adjust=FALSE) {
 
   ## Times (hours) between locations
   if(is.null(dt))
@@ -428,7 +437,7 @@ heliosModel <- function(date,light,time,x0,
   fixeds <- if(length(fixedx)==1L) FALSE else fixedx[-1L] & fixedx[-length(fixedx)]
   
   ## Contribution to log posterior for the light data
-  model <- heliosLightModel(date,light,time,alpha,zenith,forbid)
+  model <- heliosLightModel(date,light,time,alpha,zenith,forbid,max.adjust)
   logp.l <- model$logp.l
   logp.l0 <- model$logp.l0
   predict <- model$predict
@@ -477,7 +486,7 @@ heliosModel <- function(date,light,time,x0,
 
 ##' @rdname heliosModel
 ##' @export
-heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
+heliosLightModel <- function(date,light,time,alpha,zenith,forbid,max.adjust) {
 
   ## Convert times to solar time
   s <- solar(date)
@@ -498,30 +507,57 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid) {
     ## Limit to [-1,1] [!!]
     cosZ[cosZ > 1] <- 1
     cosZ[cosZ < -1] <- -1
-
+    
     ## Ignore refraction correction
     180*acos(cosZ)/pi
   }
 
-  logp.l <- function(x) {
-    ## Interpolate
-    lon <- approx(time,x[,1L],date,rule=2)$y
-    lat <- approx(time,x[,2L],date,rule=2)$y
-    ## Calculate where should be day
-    zs <- cosZenith(s,lon,lat) > cosZ
-    ## Calculate costs per segment
-    ifelse(diff(c(0,cumsum(!zs & light)[ks]))>0,forbid,-alpha*diff(c(0,cumsum(zs & !light)[ks])))
+  if(max.adjust) {
+    
+    logp.l <- function(x) {
+      ## Interpolate
+      lon <- approx(time,x[,1L],date,rule=2)$y
+      lat <- approx(time,x[,2L],date,rule=2)$y
+      ## Calculate where should be day
+      day <- cosZenith(s,lon,lat) > cosZ
+      day <- c(F,day[-length(day)]) | day 
+      ## Calculate costs per segment
+      ifelse(diff(c(0,cumsum(!day & light)[ks]))>0,forbid,-alpha*diff(c(0,cumsum(day & !light)[ks])))
+    }
+    
+    logp.l0 <- function(x) {
+      ## Calculate where should be day
+      day <- cosZenith(s,x[1L],x[2L]) > cosZ
+      day <- c(F,day[-length(day)]) | day 
+      ## Calculate costs per segment
+      ifelse(diff(c(0,cumsum(!day & light)[ks]))>0,forbid,-alpha*diff(c(0,cumsum(day & !light)[ks])))
+    }
+    
+    list(predict=predict,logp.l=logp.l,logp.l0=logp.l0)
+
+  } else {
+    
+    logp.l <- function(x) {
+      ## Interpolate
+      lon <- approx(time,x[,1L],date,rule=2)$y
+      lat <- approx(time,x[,2L],date,rule=2)$y
+      ## Calculate where should be day
+      day <- cosZenith(s,lon,lat) > cosZ
+      ## Calculate costs per segment
+      ifelse(diff(c(0,cumsum(!day & light)[ks]))>0,forbid,-alpha*diff(c(0,cumsum(day & !light)[ks])))
+    }
+    
+    logp.l0 <- function(x) {
+      ## Calculate where should be day
+      day <- cosZenith(s,x[1L],x[2L]) > cosZ
+      ## Calculate costs per segment
+      ifelse(diff(c(0,cumsum(!day & light)[ks]))>0,forbid,-alpha*diff(c(0,cumsum(day & !light)[ks])))
+    }
+    
+    list(predict=predict,logp.l=logp.l,logp.l0=logp.l0)
   }
 
-  logp.l0 <- function(x) {
-    ## Calculate where should be day
-    zs <- cosZenith(s,x[1L],x[2L]) > cosZ
-    ## Calculate costs per segment
-    ifelse(diff(c(0,cumsum(!zs & light)[ks]))>0,forbid,-alpha*diff(c(0,cumsum(zs & !light)[ks])))
-  }
-
-
-  list(predict=predict,logp.l=logp.l,logp.l0=logp.l0)
+    
 }
 
 
