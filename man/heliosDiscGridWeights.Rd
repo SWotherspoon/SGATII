@@ -6,7 +6,7 @@
 \alias{extractHeliosDiscRasterWeights}
 \title{Helios Discrete Grid Weights}
 \usage{
-heliosDiscGridWeights(grid, model, autoscale = NA, points = FALSE)
+heliosDiscGridWeights(grid, model, autoscale = NA, points = TRUE)
 
 heliosDiscRasterWeights(raster, model, autoscale = NA, points = FALSE)
 
@@ -20,8 +20,8 @@ or equivalent.}
 
 \item{autoscale}{a lower bound for the (finite) weights}
 
-\item{points}{should the contribution the posterior from the track
-points be included.}
+\item{points}{should the contribution to the posterior from the
+track points be included.}
 
 \item{raster}{a terra raster used to define the grid.}
 
@@ -66,11 +66,15 @@ raster, and can be used to visualize the computed weights.
 The weights are stored as a matrix with a row for each grid point
 and column for each point along the track, and the entries of each
 column are the relative posterior probabilities that that track
-point passes through the corresponding grid point.  If
-\code{points=FALSE} the weights are calculated only the contribution to
-the posterior from the light data alone, but if \code{points=TRUE} the
-contributions to the posterior from the track points are also
-included.
+point passes through the corresponding grid point.
+
+If \code{points=FALSE} the weights are calculated from the light data
+along tracks segments and the contribution to the posterior from
+the track points.  If \code{points=FALSE} the weights are calculated
+from the contribution to the posterior from the light data alone.
+If the contribution to the posterior from the tracks points is
+only used to exclude locations, it is more efficient to exclude
+those points from the grid directly and set \code{points=FALSE}.
 
 If \code{autoscale} is \code{NA} the scaling of the weights is determined
 directly by the posterior. Otherwise the weights are scaled so the

@@ -69,6 +69,8 @@ posterior from the track points}
 posterior from the light model on each segment}
 \item{\code{logp.b}}{function to evaluate the contributions to the log
 posterior from the behavioural model on each segment}
+\item{\code{logp.l0}}{an optimized form of \code{logp.l} that assumes the
+track is stationary.}
 \item{\code{predict}}{function to predict the zenith angle along a given
 track.}
 \item{\code{Date}}{POSIXct vector of times for day/night observations.}
@@ -130,11 +132,12 @@ posterior for each track segment, and a funtion \code{logp.p0} that
 returns an additional contribution to the posterior for each
 location.
 
-Some tags record the maximum light level observed in the preceeding sampling
-interval, so that when the sun is going down, the tag reports the light from
-the beginning of the sampling interval. The \code{max.adjust} argument tries to
-compensate for this behaviour, and for some tags will yield more reliable
-estimates.  However, this optiion does not impact the along track zenith
-angles calculated by \code{predict}, and for some applications these may need
-manual adjustment.
+Some tags record the maximum light level observed in the
+preceeding sampling interval, so that when the sun is going down,
+the tag reports the light from the beginning of the sampling
+interval. The \code{max.adjust} argument tries to compensate for this
+behaviour, and for some tags will yield more reliable estimates.
+However, this optiion does not impact the along track zenith
+angles calculated by \code{predict}, and for some applications these
+may need manual adjustment.
 }
