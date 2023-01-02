@@ -41,4 +41,8 @@ shorter tracks, at the expense of the accuracy with which the
 fitted track reproduces the observed light.  For efficiency, the
 distance penalty is calculated for only the \code{ngbrs} nearest
 neighbours of each grid point.
+
+The resulting track is discretized to the grid, and so for coarser
+grids it may be desirable to set the fixed points back to their
+exact locations for use in further analysis.
 }

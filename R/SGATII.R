@@ -393,7 +393,7 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
 ##' @param zenith the solar zenith angle that defines day/night.
 ##' @param forbid the log likelihood for forbidden light observations
 ##' @param max.adjust adjust for tags that record the maximum light
-##'   level observed in the interval 
+##'   level observed in the interval
 ##' @return The `heliosModel` function returns list with components
 ##' \item{`time`}{the times at which locations are estimated}
 ##' \item{`x0`}{a two column array of initial location estimates.}
@@ -440,7 +440,7 @@ heliosModel <- function(date,light,time,x0,
 
   ## Set fixed segments
   fixeds <- if(length(fixedx)==1L) FALSE else fixedx[-1L] & fixedx[-length(fixedx)]
-  
+
   ## Contribution to log posterior for the light data
   model <- heliosLightModel(date,light,time,alpha,zenith,forbid,max.adjust)
   logp.l <- model$logp.l
@@ -501,7 +501,6 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid,max.adjust) {
 
   segments <- as.numeric(cut(date,time,labels=FALSE,include.lowest=TRUE))
   ks <- c(which(diff(segments)==1),length(date))
-  ls <- light > 0
 
   predict <- function(x) {
     ## Interpolate
@@ -551,18 +550,18 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid,max.adjust) {
       ## Calculate costs per segment
       ifelse(diff(c(0,cumsum(!day & light)[ks]))>0,forbid,-alpha*diff(c(0,cumsum(day & !light)[ks])))
     }
-    
+
     logp.l0 <- function(x) {
       ## Calculate where should be day
       day <- cosZenith(s,x[1L],x[2L]) > cosZ
       ## Calculate costs per segment
       ifelse(diff(c(0,cumsum(!day & light)[ks]))>0,forbid,-alpha*diff(c(0,cumsum(day & !light)[ks])))
     }
-    
+
     list(predict=predict,logp.l=logp.l,logp.l0=logp.l0)
   }
 
-    
+
 }
 
 
@@ -953,6 +952,10 @@ heliosDiscSampler <- function(weights,x=NULL,iters=100L) {
 ##' distance penalty is calculated for only the `ngbrs` nearest
 ##' neighbours of each grid point.
 ##'
+##' The resulting track is discretized to the grid, and so for coarser
+##' grids it may be desirable to set the fixed points back to their
+##' exact locations for use in further analysis.
+##'
 ##' @title Minimal distance paths on a discrete grid.
 ##' @param weights a weights object generated with
 ##'   `heliosDiscGridWeights` or `heliosDiscRasterWeights`
@@ -997,7 +1000,7 @@ heliosDiscMinimalTrack <- function(weights,gamma,ngbrs=50) {
         coslat*cos(rad*x0[k,2L])*
           cos(rad*(grid[,1L]-x0[k,1L]))+sinlat*sin(rad*x0[k,2L]),1)))
   }
-  
+
   ## Path matrix
   K <- matrix(0L,nrow(W),ncol(W))
 
@@ -1006,7 +1009,7 @@ heliosDiscMinimalTrack <- function(weights,gamma,ngbrs=50) {
     maxL <- ifelse(1L:n==fixed[1L],0,forbid)
   else
     maxL <- log(W[,1L])
-  
+
 
   for(k in 2L:ncol(W)) {
 
@@ -1016,7 +1019,7 @@ heliosDiscMinimalTrack <- function(weights,gamma,ngbrs=50) {
       L <- maxL[N]-gamma*D
       ## Select the neighbours that maximise L
       ks <- cbind(1L:n,max.col(L))
-      ## Update maximum      
+      ## Update maximum
       maxL <- L[ks]+log(W[,k])
       ## Record path
       K[,k-1L] <- N[ks]
@@ -1030,7 +1033,7 @@ heliosDiscMinimalTrack <- function(weights,gamma,ngbrs=50) {
         ## Record path
         K[,k-1L] <- fixed[k-1L]
       }
-      
+
       ## Previous point fixed
       if(fixed[k-1L]>0 && fixed[k]==0) {
         ## All distances to fixed point
@@ -1144,7 +1147,7 @@ locationSummary <- function(obj,time=NULL,discard=0,alpha=0.95,
     time <- obj$model$time
   } else
     s <- obj
-  
+
   s <- chainCollapse(s,collapse=collapse,discard=discard,chains=chains)
   if(is.list(s)) lapply(s,summary) else summary(s)
 }
@@ -1197,7 +1200,7 @@ locationImage <- function(s,xlim,ylim,nx,ny,weight=rep_len(1,dim(s)[1L]),
 
   bin <- function(s) {
     W <- 0
-    for(k in 1L:dim(s)[1L]) {
+    for(k in seq_len(dim(s)[1L])) {
       W <- W+weight[k]*table(
         factor(.bincode(s[k,1L,],xbin),levels=1L:nx),
         factor(.bincode(s[k,2L,],ybin),levels=1L:ny))
@@ -1329,7 +1332,7 @@ chainAcceptance <- function(s,collapse=FALSE,chains=NULL) {
 
   s <- chainCollapse(s,collapse=FALSE,chains=chains)
   r <- if(is.list(s)) lapply(s,rate) else rate(s)
-  if(collapse & is.list(r)) do.call(mean,r) else r
+  if(collapse && is.list(r)) do.call(mean,r) else r
 }
 
 
