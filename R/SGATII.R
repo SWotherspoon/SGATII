@@ -511,36 +511,38 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid,max.adjust) {
     ## Limit to [-1,1] [!!]
     cosZ[cosZ > 1] <- 1
     cosZ[cosZ < -1] <- -1
-    
+
     ## Ignore refraction correction
     180*acos(cosZ)/pi
   }
 
   if(max.adjust) {
-    
+
     logp.l <- function(x) {
       ## Interpolate
       lon <- approx(time,x[,1L],date,rule=2)$y
       lat <- approx(time,x[,2L],date,rule=2)$y
       ## Calculate where should be day
       day <- cosZenith(s,lon,lat) > cosZ
-      day <- c(FALSE,day[-length(day)]) | day 
+      #day <- c(FALSE,day[-length(day)]) | day
+      day <- c(rep(FALSE,max.adjust),day[-seq.int(to=length(day),length.out=max.adjust)]) | day
       ## Calculate costs per segment
       ifelse(diff(c(0,cumsum(!day & light)[ks]))>0,forbid,-alpha*diff(c(0,cumsum(day & !light)[ks])))
     }
-    
+
     logp.l0 <- function(x) {
       ## Calculate where should be day
       day <- cosZenith(s,x[1L],x[2L]) > cosZ
-      day <- c(FALSE,day[-length(day)]) | day 
+      day <- c(FALSE,day[-length(day)]) | day
+      day <- c(rep(FALSE,max.adjust),day[-seq.int(to=length(day),length.out=max.adjust)]) | day
       ## Calculate costs per segment
       ifelse(diff(c(0,cumsum(!day & light)[ks]))>0,forbid,-alpha*diff(c(0,cumsum(day & !light)[ks])))
     }
-    
+
     list(predict=predict,logp.l=logp.l,logp.l0=logp.l0)
 
   } else {
-    
+
     logp.l <- function(x) {
       ## Interpolate
       lon <- approx(time,x[,1L],date,rule=2)$y
