@@ -8,13 +8,13 @@
 locationSummary(
   obj,
   time = NULL,
-  discard = 0,
+  discard = 0L,
   alpha = 0.95,
   collapse = TRUE,
   chains = NULL
 )
 
-locationMean(obj, discard = 0, collapse = TRUE, chains = NULL)
+locationMean(obj, discard = 0L, collapse = TRUE, chains = NULL)
 }
 \arguments{
 \item{obj}{the object, or a single chain or a list of parallel

@@ -301,9 +301,9 @@ zenithSimulate <- function(tm,lon,lat,tm.out) {
   lon <- unwrapLon(lon)
   ## Interpolate track
   keep <- !is.na(lon)
-  lon.out <- approx(tm[keep],lon[keep],tm.out,rule=2)$y
+  lon.out <- approx(tm[keep],lon[keep],tm.out,rule=2L)$y
   keep <- !is.na(lat)
-  lat.out <- approx(tm[keep],lat[keep],tm.out,rule=2)$y
+  lat.out <- approx(tm[keep],lat[keep],tm.out,rule=2L)$y
   ## Compute zenith angles
   z <- zenith(solar(tm.out),lon.out,lat.out)
   data.frame(Date=tm.out,
@@ -436,7 +436,7 @@ heliosModel <- function(date,light,time,x0,
   date <- date[date >= min(time) & date <= max(time)]
 
   ## Check fixed points
-  if(any(is.na(x0[fixedx,]))) warning("Fixed points cannot be NA")
+  if(anyNA(x0[fixedx,])) warning("Fixed points cannot be NA")
 
   ## Set fixed segments
   fixeds <- if(length(fixedx)==1L) FALSE else fixedx[-1L] & fixedx[-length(fixedx)]
@@ -520,8 +520,8 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid,max.adjust) {
 
     logp.l <- function(x) {
       ## Interpolate
-      lon <- approx(time,x[,1L],date,rule=2)$y
-      lat <- approx(time,x[,2L],date,rule=2)$y
+      lon <- approx(time,x[,1L],date,rule=2L)$y
+      lat <- approx(time,x[,2L],date,rule=2L)$y
       ## Calculate where should be day
       day <- cosZenith(s,lon,lat) > cosZ
       #day <- c(FALSE,day[-length(day)]) | day
@@ -545,8 +545,8 @@ heliosLightModel <- function(date,light,time,alpha,zenith,forbid,max.adjust) {
 
     logp.l <- function(x) {
       ## Interpolate
-      lon <- approx(time,x[,1L],date,rule=2)$y
-      lat <- approx(time,x[,2L],date,rule=2)$y
+      lon <- approx(time,x[,1L],date,rule=2L)$y
+      lat <- approx(time,x[,2L],date,rule=2L)$y
       ## Calculate where should be day
       day <- cosZenith(s,lon,lat) > cosZ
       ## Calculate costs per segment
@@ -863,7 +863,7 @@ heliosDiscSampler <- function(weights,x=NULL,iters=100L) {
     q1 <- rep(1,nrow(x))
   } else {
     ## Draw an initial sample
-    is <- vapply(seq_len(n),function(k) sample(m,1,prob=W[,k]),0L)
+    is <- vapply(seq_len(n),function(k) sample(m,1L,prob=W[,k]),0L)
     x1 <- grid[is,]
     q1 <- W[cbind(is,seq_len(n))]
   }
@@ -871,7 +871,7 @@ heliosDiscSampler <- function(weights,x=NULL,iters=100L) {
   q1[fixedx] <- 1
 
   ## Allocate chain
-  ch <- array(0,c(n,2,iters))
+  ch <- array(0,c(n,2L,iters))
 
   ## Contribution to logp from each track segment, padded with
   ## fictitious segments at each end
@@ -884,7 +884,7 @@ heliosDiscSampler <- function(weights,x=NULL,iters=100L) {
   for(k in seq_len(iters)) {
 
     ## Propose all x at once, keeping fixed points
-    is <- vapply(seq_len(n),function(k) sample(m,1,prob=W[,k]),0L)
+    is <- vapply(seq_len(n),function(k) sample(m,1L,prob=W[,k]),0L)
     xp <- grid[is,]
     qp <- W[cbind(is,seq_len(n))]
     xp[fixedx] <- x1[fixedx]
@@ -1122,7 +1122,7 @@ nlocation <- function(s) {
 ##' of the means of the samples for each location.}
 ##' @importFrom stats sd quantile
 ##' @export
-locationSummary <- function(obj,time=NULL,discard=0,alpha=0.95,
+locationSummary <- function(obj,time=NULL,discard=0L,alpha=0.95,
                             collapse=TRUE,chains=NULL) {
   summary <- function(s) {
     stat <- function(x) c(mean=mean(x),
@@ -1156,7 +1156,7 @@ locationSummary <- function(obj,time=NULL,discard=0,alpha=0.95,
 
 ##' @rdname locationSummary
 ##' @export
-locationMean <- function(obj,discard=0,collapse=TRUE,chains=NULL) {
+locationMean <- function(obj,discard=0L,collapse=TRUE,chains=NULL) {
   locmean <- function(s) apply(s[,1L:2L,],1L:2L,mean)
 
   s <- if(is.list(obj) && !is.null(obj$x)) obj$x else obj
@@ -1194,7 +1194,7 @@ locationMean <- function(obj,discard=0,collapse=TRUE,chains=NULL) {
 ##' \item{`W`}{the weighted image.}
 ##' @export
 locationImage <- function(s,xlim,ylim,nx,ny,weight=rep_len(1,dim(s)[1L]),
-                           discard=0,collapse=TRUE,chains=NULL) {
+                           discard=0L,collapse=TRUE,chains=NULL) {
   nx <- round(nx)
   ny <- round(ny)
   xbin <- seq.int(xlim[1L],xlim[2L],length.out=nx+1L)
@@ -1244,7 +1244,7 @@ locationImage <- function(s,xlim,ylim,nx,ny,weight=rep_len(1,dim(s)[1L]),
 ##' * `chainAcceptance` returns the acceptance rate in the (thinned) chain
 ##' @export
 chainSummary <- function(s) {
-  dm <- dim(s[[1]])
+  dm <- dim(s[[1L]])
   cat("Sample of",
       dm[3L],"from",
       length(s),"chains of",
@@ -1254,7 +1254,7 @@ chainSummary <- function(s) {
 
 ##' @rdname chainSummary
 ##' @export
-chainTail <- function(s,discard=0,thin=1) {
+chainTail <- function(s,discard=0L,thin=1L) {
   tail <- function(s)
     s[,,seq.int(from=1+max(discard,0),to=dim(s)[3L],by=thin)]
   if(!is.list(s)) tail(s) else lapply(s,tail)
@@ -1270,17 +1270,17 @@ chainLast <- function(s) {
 
 ##' @rdname chainSummary
 ##' @export
-chainCollapse <- function(s,collapse=TRUE,discard=0,thin=1,chains=NULL) {
+chainCollapse <- function(s,collapse=TRUE,discard=0L,thin=1L,chains=NULL) {
   subset <- function(s)
-    s[,,seq.int(from=1+max(discard,0),to=dim(s)[3L],by=thin)]
+    s[,,seq.int(from=1L+max(discard,0L),to=dim(s)[3L],by=thin)]
   if(!is.list(s)) {
-    if(thin>1 || discard>0)
+    if(thin>1L || discard>0L)
       s <- subset(s)
   } else {
     if(!is.null(chains)) s <- s[chains]
-    if(thin>1 || discard>0) s <- lapply(s,subset)
+    if(thin>1L || discard>0L) s <- lapply(s,subset)
     if(collapse) {
-      dm <- dim(s[[1]])
+      dm <- dim(s[[1L]])
       s <- array(unlist(s),c(dm[1L:2L],length(s)*dm[3L]))
     }
   }
@@ -1292,13 +1292,13 @@ chainCollapse <- function(s,collapse=TRUE,discard=0,thin=1,chains=NULL) {
 ##' @rdname chainSummary
 ##' @importFrom stats var
 ##' @export
-chainCov <- function(s,discard=0,chains=NULL) {
+chainCov <- function(s,discard=0L,chains=NULL) {
   s <- chainCollapse(s,collapse=FALSE,discard=discard,chains=chains)
 
   if(!is.list(s)) {
     V <- apply(s,1L,function(x) var(t(x)))
   } else {
-    dm <- dim(s[[1]])
+    dm <- dim(s[[1L]])
     V <- apply(array(
       unlist(lapply(s, function(s) apply(s,1L,function(y) var(t(y))))),
       c(dm[c(2L,2L,1L)],length(s))),
@@ -1312,7 +1312,7 @@ chainCov <- function(s,discard=0,chains=NULL) {
 ##' @rdname chainSummary
 ##' @importFrom stats var
 ##' @export
-chainBcov <- function(s,discard=0,chains=NULL) {
+chainBcov <- function(s,discard=0L,chains=NULL) {
   bcov <- function(s) {
     dm <- dim(s)
     dim(s) <- c(prod(dm[1L:2L]),dm[3L])
@@ -1330,7 +1330,7 @@ chainBcov <- function(s,discard=0,chains=NULL) {
 ##' @export
 chainAcceptance <- function(s,collapse=FALSE,chains=NULL) {
   rate <- function(s)
-    mean(apply(s,1,function(x) mean(rowMeans(x[,-1L]-x[,-ncol(x)]!=0))))
+    mean(apply(s,1L,function(x) mean(rowMeans(x[,-1L]-x[,-ncol(x)]!=0))))
 
   s <- chainCollapse(s,collapse=FALSE,chains=chains)
   r <- if(is.list(s)) lapply(s,rate) else rate(s)
@@ -1411,7 +1411,7 @@ mvnorm <- function(S,s=1,n=1,tol=1.0E-6) {
   }
 
   m <- dim(S)[1L]
-  if(length(dim(S))==2) {
+  if(length(dim(S))==2L) {
     S <- array(s*fchol(S),c(m,m,n))
   } else {
     n <- dim(S)[3L]

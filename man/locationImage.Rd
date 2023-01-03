@@ -11,7 +11,7 @@ locationImage(
   nx,
   ny,
   weight = rep_len(1, dim(s)[1L]),
-  discard = 0,
+  discard = 0L,
   collapse = TRUE,
   chains = NULL
 )

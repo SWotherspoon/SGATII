@@ -12,15 +12,15 @@
 \usage{
 chainSummary(s)
 
-chainTail(s, discard = 0, thin = 1)
+chainTail(s, discard = 0L, thin = 1L)
 
 chainLast(s)
 
-chainCollapse(s, collapse = TRUE, discard = 0, thin = 1, chains = NULL)
+chainCollapse(s, collapse = TRUE, discard = 0L, thin = 1L, chains = NULL)
 
-chainCov(s, discard = 0, chains = NULL)
+chainCov(s, discard = 0L, chains = NULL)
 
-chainBcov(s, discard = 0, chains = NULL)
+chainBcov(s, discard = 0L, chains = NULL)
 
 chainAcceptance(s, collapse = FALSE, chains = NULL)
 }
