@@ -987,8 +987,8 @@ heliosDiscMinimalTrack <- function(weights,gamma,ngbrs=50) {
   D <- matrix(0.0,n,ngbrs)
   N <- matrix(0L,n,ngbrs)
   for(i in seq_len(n)) {
-    d <- 6378.137*acos(pmin.int(
-      coslat*coslat[i]*cos(rad*(grid[,1L]-grid[i,1L]))+sinlat*sinlat[i],1))
+    d <- 6378.137*acos(pmax.int(pmin.int(
+      coslat*coslat[i]*cos(rad*(grid[,1L]-grid[i,1L]))+sinlat*sinlat[i],1),-1))
     ks <- order(d)[1L:ngbrs]
     N[i,] <- ks
     D[i,] <- d[ks]
@@ -998,9 +998,9 @@ heliosDiscMinimalTrack <- function(weights,gamma,ngbrs=50) {
   fixed <- integer(ncol(W))
   for(k in seq_along(fixed)) {
     if(fixedx[k])
-      fixed[k] <- which.min(6378.137*acos(pmin.int(
+      fixed[k] <- which.min(6378.137*acos(pmax.int(pmin.int(
         coslat*cos(rad*x0[k,2L])*
-          cos(rad*(grid[,1L]-x0[k,1L]))+sinlat*sin(rad*x0[k,2L]),1)))
+          cos(rad*(grid[,1L]-x0[k,1L]))+sinlat*sin(rad*x0[k,2L]),1),-1)))
   }
 
   ## Path matrix
