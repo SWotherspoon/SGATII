@@ -10,7 +10,7 @@ heliosDiscGridWeights(grid, model, autoscale = NA, points = TRUE)
 
 heliosDiscRasterWeights(raster, model, autoscale = NA, points = FALSE)
 
-extractHeliosDiscRasterWeights(raster, weights, k, log = FALSE)
+extractHeliosDiscRasterWeights(raster, weights, k, log = TRUE)
 }
 \arguments{
 \item{grid}{a two column matrix of (lon,lat) grid points.}

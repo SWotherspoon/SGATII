@@ -27,7 +27,7 @@ the locations are constrained to a discrete spatial grid, and can
 be used to generate an initial track for the
 \code{\link[=heliosMetropolis]{heliosMetropolis()}} sampler.  The sampler requires a weights
 object generated with either \code{\link[=heliosDiscGridWeights]{heliosDiscGridWeights()}} or
-\code{\link[=heliosDiscRasterWeights]{heliosDiscRasterWeights()}} with \code{log=FALSE}.
+\code{\link[=heliosDiscRasterWeights]{heliosDiscRasterWeights()}}.
 
 The weights define the proposal distribution used by the sampler
 and represent the relative probabilities of a grid point being
