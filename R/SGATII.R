@@ -704,7 +704,7 @@ heliosMetropolis <- function(model,proposal,x0=NULL,
 ##' column are the relative posterior probabilities that that track
 ##' point passes through the corresponding grid point.
 ##'
-##' If `points=FALSE` the weights are calculated from the light data
+##' If `points=TRUE` the weights are calculated from the light data
 ##' along tracks segments and the contribution to the posterior from
 ##' the track points.  If `points=FALSE` the weights are calculated
 ##' from the contribution to the posterior from the light data alone.
