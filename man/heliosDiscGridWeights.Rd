@@ -68,7 +68,7 @@ and column for each point along the track, and the entries of each
 column are the relative posterior probabilities that that track
 point passes through the corresponding grid point.
 
-If \code{points=FALSE} the weights are calculated from the light data
+If \code{points=TRUE} the weights are calculated from the light data
 along tracks segments and the contribution to the posterior from
 the track points.  If \code{points=FALSE} the weights are calculated
 from the contribution to the posterior from the light data alone.

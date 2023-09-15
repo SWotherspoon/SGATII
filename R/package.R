@@ -5,5 +5,5 @@
 #'
 #' @name SGAT-package
 #' @docType package
-#' @author S. Wotherspoon, M. Sumner, A. Bindoff and S. Lisovski.
+#' @author S. Wotherspoon, M. Sumner, A. Bindoff, B. Raymond and S. Lisovski.
 NULL

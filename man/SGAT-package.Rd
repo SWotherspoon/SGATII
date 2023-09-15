@@ -9,5 +9,5 @@ Provides facilities for estimating broadscale animal motions from
 local light level data recorded by an archival tag.
 }
 \author{
-S. Wotherspoon, M. Sumner, A. Bindoff and S. Lisovski.
+S. Wotherspoon, M. Sumner, A. Bindoff, B. Raymond and S. Lisovski.
 }
