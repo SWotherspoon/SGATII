@@ -600,7 +600,7 @@ heliosMetropolis <- function(model,proposal,x0=NULL,
   ## Initialize x0
   if(is.null(x0)) x0 <- model$x0
   ## Expand starting values for multiple chains
-  x0 <- rep(if(is.list(x0)) x0 else list(x0),length.out=chains)
+  x0 <- rep_len(if(is.list(x0)) x0 else list(x0),length.out=chains)
 
   ## Number of locations
   n <- nrow(x0[[1L]])
@@ -742,7 +742,7 @@ heliosDiscGridWeights <- function(grid,model,
   m <- nrow(grid)
   n <- length(model$time)
   forbid <- model$forbid
-  autoscale <- rep(autoscale,length.out=n)
+  autoscale <- rep_len(autoscale,length.out=n)
 
   ## Matrix of contributions to the posterior for each point of the
   ## grid, assuming animal is stationary.
